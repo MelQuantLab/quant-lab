@@ -23,4 +23,3 @@ def test_load_prices_from_csv_reports_missing_columns(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="missing required columns"):
         load_prices_from_csv(path)
-

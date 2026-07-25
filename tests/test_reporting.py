@@ -22,4 +22,3 @@ def test_export_result_creates_excel_ready_files(tmp_path) -> None:
     metrics = json.loads(paths["metrics"].read_text(encoding="utf-8"))
     assert metrics["short_window"] == 5
     assert metrics["long_window"] == 20
-
