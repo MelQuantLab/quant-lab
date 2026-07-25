@@ -12,14 +12,70 @@ Status: **Python MVP complete and verified**
 
 Next stage: Excel/VBA dashboard and weekly PDF/email automation.
 
-The first project tests a transparent long-or-cash trend-following rule. When
-the short simple moving average (SMA) is above the long SMA, the strategy holds
-the instrument; otherwise, it holds cash.
+> **Can a simple trend-following rule deliver a better return-to-risk outcome
+> or reduce losses compared with continuously holding SPY?**
 
-The research question is:
+### What is being tested?
 
-> Can a simple SMA crossover improve the return-to-risk profile or reduce
-> drawdown relative to buy-and-hold after signal delay and transaction costs?
+SPY is a US-listed exchange-traded fund designed to track the S&P 500. This
+project compares two ways of gaining exposure to it:
+
+1. **Buy-and-hold:** remain continuously invested in SPY.
+2. **Trend-following strategy:** hold SPY only when its 50-day simple moving
+   average (SMA) is above its 200-day SMA; otherwise, hold cash.
+
+The 50-day SMA represents the more recent price trend. The 200-day SMA
+represents the longer-term trend. When the faster average rises above the
+slower average, the rule treats that as evidence of a positive trend.
+
+The signal calculated at today's close is applied on the next trading day.
+This prevents the backtest from using information before it would have been
+available. A 5 basis point transaction cost is charged whenever the position
+changes.
+
+### Why does this matter?
+
+A strategy should not be judged only by whether it makes money. It should be
+compared with a realistic alternative and evaluated across return, volatility,
+drawdown, transaction costs and time invested.
+
+This project tests whether temporarily moving to cash during negative trends
+reduces risk enough to justify missing part of SPY's long-term growth. A
+negative result is still useful: it demonstrates that the hypothesis was
+tested honestly and prevents a simple, familiar rule from being mistaken for
+an investable edge without evidence.
+
+The wider purpose is to create a reusable research workflow:
+
+```text
+Data → hypothesis → signal → lagged position → costs → returns → risk → decision
+```
+
+The same framework can later support momentum, relative-value, volatility and
+credit-market research.
+
+### Who is this for?
+
+The repository is intended for:
+
+- Quantitative research, trading and portfolio-management teams assessing my
+  research process.
+- Recruiters and hiring managers who want evidence beyond a list of technical
+  skills.
+- Other learners who want a compact example of a bias-aware backtest.
+- My own research library, so assumptions, failures and future improvements
+  remain reproducible.
+
+### Where does the data come from?
+
+The demonstration downloads public daily SPY data from Yahoo Finance using the
+Python `yfinance` library. With automatic adjustment enabled, the closing-price
+series reflects corporate actions such as distributions and stock splits.
+
+The current sample runs from 4 January 2010 through 23 July 2026. Yahoo Finance
+is convenient for public learning and reproducibility, but it is not presented
+as an institutional-grade source such as Bloomberg. The program can also read
+a permitted local CSV containing `Date` and `Close` columns.
 
 ### What the project currently does
 
