@@ -45,12 +45,49 @@ def _save_overview_chart(
     destination: Path,
     label: str,
 ) -> None:
+    strategy_growth = float(frame["strategy_equity"].iloc[-1])
+    benchmark_growth = float(frame["benchmark_equity"].iloc[-1])
+    maximum_drawdown = float(frame["drawdown"].min())
+    relative_result = (
+        "outperformed"
+        if strategy_growth > benchmark_growth
+        else "underperformed"
+    )
+
     fig, axes = plt.subplots(
         3,
         1,
-        figsize=(12, 10),
+        figsize=(12, 12),
         sharex=True,
         gridspec_kw={"height_ratios": [2, 2, 1]},
+    )
+    explanation = (
+        "HOW TO READ THIS REPORT\n"
+        "Purpose: test whether a simple moving-average rule improves the result "
+        "of holding the market after costs and a one-day signal delay.\n"
+        "Top: the market price and the two moving averages used to create the "
+        "signal. Middle: what £1 grew to in the strategy versus buy-and-hold. "
+        "Bottom: the strategy's fall from its previous peak.\n"
+        f"Current takeaway: £1 became £{strategy_growth:.2f} in the strategy "
+        f"versus £{benchmark_growth:.2f} in buy-and-hold. The strategy "
+        f"{relative_result}, and its worst peak-to-trough fall was "
+        f"{maximum_drawdown:.1%}. This historical test is evidence, not a "
+        "prediction or investment recommendation."
+    )
+    fig.text(
+        0.06,
+        0.975,
+        explanation,
+        ha="left",
+        va="top",
+        fontsize=10,
+        linespacing=1.45,
+        bbox={
+            "boxstyle": "round,pad=0.7",
+            "facecolor": "#F3F6FA",
+            "edgecolor": "#2878B5",
+            "linewidth": 1.2,
+        },
     )
 
     axes[0].plot(frame.index, frame["price"], label="Adjusted close", color="#17365D")
@@ -89,7 +126,6 @@ def _save_overview_chart(
     axes[2].set_ylabel("Drawdown")
     axes[2].grid(alpha=0.2)
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.82))
     fig.savefig(destination, dpi=160, bbox_inches="tight")
     plt.close(fig)
-
