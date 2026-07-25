@@ -85,10 +85,15 @@ a permitted local CSV containing `Date` and `Close` columns.
 - Applies configurable transaction costs whenever the position changes.
 - Compares net strategy performance with buy-and-hold.
 - Reports annualised return, volatility, Sharpe ratio and maximum drawdown.
+  Annualised return is suppressed for samples shorter than 60 trading days,
+  and samples shorter than one trading year carry an insufficient-history flag.
 - Reports entries, exits, exposure and total modelled transaction costs.
+- Reports win rate over completed trades only; any position still open at the
+  end of the sample is identified separately.
 - Exports an Excel-ready time-series CSV and metrics JSON.
 - Generates a three-panel price, equity and drawdown chart.
-- Tests signal timing, costs, compounding and invalid inputs.
+- Tests signal timing, costs, compounding, invalid inputs and both flat and
+  MultiIndex Yahoo Finance download formats without making network calls.
 
 ### Research design
 

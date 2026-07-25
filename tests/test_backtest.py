@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from melquantlab.backtest import BacktestConfig, run_backtest
+from melquantlab.backtest import (
+    MIN_ANNUALISATION_PERIODS,
+    BacktestConfig,
+    run_backtest,
+)
 
 
 def price_series(values: list[float]) -> pd.Series:
@@ -73,7 +77,7 @@ def test_strategy_equity_matches_compounded_net_returns() -> None:
     assert result.metrics["maximum_drawdown"] <= 0
     assert result.metrics["benchmark_maximum_drawdown"] <= 0
     assert 0 <= result.metrics["exposure"] <= 1
-    assert 0 <= result.metrics["win_rate"] <= 1
+    assert 0 <= result.metrics["closed_trade_win_rate"] <= 1
     assert result.metrics["closed_trades"] == result.metrics["exits"]
 
 
@@ -82,3 +86,26 @@ def test_prices_must_be_positive() -> None:
 
     with pytest.raises(ValueError, match="strictly positive"):
         run_backtest(prices, BacktestConfig(short_window=2, long_window=3))
+
+
+def test_short_sample_suppresses_annualised_return() -> None:
+    sample_length = MIN_ANNUALISATION_PERIODS - 1
+    result = run_backtest(
+        price_series(list(np.linspace(100, 120, sample_length))),
+        BacktestConfig(short_window=5, long_window=20),
+    )
+
+    assert result.metrics["insufficient_history_for_annualisation"] is True
+    assert result.metrics["strategy_annualised_return"] is None
+    assert result.metrics["benchmark_annualised_return"] is None
+
+
+def test_full_year_sample_reports_annualised_return() -> None:
+    result = run_backtest(
+        price_series(list(np.linspace(100, 140, 260))),
+        BacktestConfig(short_window=5, long_window=20),
+    )
+
+    assert result.metrics["insufficient_history_for_annualisation"] is False
+    assert isinstance(result.metrics["strategy_annualised_return"], float)
+    assert isinstance(result.metrics["benchmark_annualised_return"], float)

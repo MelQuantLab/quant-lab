@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 TRADING_DAYS_PER_YEAR = 252
+MIN_ANNUALISATION_PERIODS = 60
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,7 @@ class BacktestResult:
     """Time series and summary statistics produced by a backtest."""
 
     frame: pd.DataFrame
-    metrics: dict[str, float | int | str]
+    metrics: dict[str, float | int | str | bool | None]
     config: BacktestConfig
 
 
@@ -56,10 +57,14 @@ def _validate_prices(prices: pd.Series) -> pd.Series:
     return clean.astype(float).rename("price")
 
 
-def _annualised_return(returns: pd.Series) -> float:
+def _annualised_return(returns: pd.Series) -> float | None:
+    """Annualise returns only when the sample is long enough to be meaningful."""
+
     returns = returns.dropna()
     if returns.empty:
         return 0.0
+    if len(returns) < MIN_ANNUALISATION_PERIODS:
+        return None
     growth = float((1.0 + returns).prod())
     if growth <= 0:
         return -1.0
@@ -125,6 +130,7 @@ def run_backtest(
 
     The raw signal is shifted by one trading day before it becomes a position.
     This prevents today's closing-price signal from earning today's return.
+    Closed-trade win rate excludes a position still open at the sample end.
     """
 
     config = config or BacktestConfig()
@@ -145,6 +151,7 @@ def run_backtest(
     # Anti-look-ahead rule: a signal calculated at close t is held from t+1.
     frame["position"] = frame["signal"].shift(1).fillna(0.0)
     frame["benchmark_return"] = frame["price"].pct_change().fillna(0.0)
+    # Opening a day-one position from flat is a trade and incurs an entry cost.
     frame["turnover"] = frame["position"].diff().abs().fillna(
         frame["position"].abs()
     )
@@ -175,13 +182,16 @@ def run_backtest(
         float(np.mean(closed_trade_returns)) if closed_trade_returns else 0.0
     )
 
-    metrics: dict[str, float | int | str] = {
+    metrics: dict[str, float | int | str | bool | None] = {
         "start_date": frame.index.min().date().isoformat(),
         "end_date": frame.index.max().date().isoformat(),
         "observations": int(len(frame)),
         "short_window": config.short_window,
         "long_window": config.long_window,
         "transaction_cost_bps": config.transaction_cost_bps,
+        "insufficient_history_for_annualisation": bool(
+            len(strategy.dropna()) < TRADING_DAYS_PER_YEAR
+        ),
         "strategy_total_return": float(frame["strategy_equity"].iloc[-1] - 1.0),
         "benchmark_total_return": float(frame["benchmark_equity"].iloc[-1] - 1.0),
         "strategy_annualised_return": _annualised_return(strategy),
@@ -200,7 +210,7 @@ def run_backtest(
         "exits": exits,
         "closed_trades": len(closed_trade_returns),
         "open_trade": int(entries > exits),
-        "win_rate": win_rate,
+        "closed_trade_win_rate": win_rate,
         "average_closed_trade_return": average_trade_return,
         "total_transaction_cost": float(frame["transaction_cost"].sum()),
         "exposure": float(frame["position"].mean()),
