@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.mplconfig/
+htmlcov/
+build/
+dist/
+*.egg-info/
+data/raw/*
+!data/raw/.gitkeep
+reports/*
+!reports/.gitkeep
