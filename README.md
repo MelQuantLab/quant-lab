@@ -8,7 +8,9 @@ a reproducible research decision pack rather than a guaranteed-profit claim.
 
 ## Project 1: Systematic Moving-Average Crossover Backtester
 
-Status: **In development**
+Status: **Python MVP complete and verified**
+
+Next stage: Excel/VBA dashboard and weekly PDF/email automation.
 
 The first project tests a transparent long-or-cash trend-following rule. When
 the short simple moving average (SMA) is above the long SMA, the strategy holds
@@ -63,6 +65,14 @@ over this sample. It also spent approximately 79.77% of days invested. This is
 a useful negative result: the rule is understandable and reproducible, but the
 current evidence does not establish an investable edge.
 
+### Plain-English report
+
+The box at the top explains the purpose of the test, how to read each panel and
+the current conclusion. The figures update automatically whenever a new report
+is generated.
+
+![SPY 50/200 SMA backtest with a plain-English explanation, equity comparison and drawdown](docs/images/SPY_50_200_overview.png)
+
 These figures are a historical methodology demonstration, not investment
 advice, live performance or a claim that the strategy will remain effective.
 Results depend on data quality, assumptions, sample period and implementation.
@@ -116,6 +126,7 @@ pytest
 ```text
 quant-lab/
 ├── data/raw/                  # Local inputs; contents are not committed
+├── docs/images/               # Curated public research figures
 ├── reports/                   # Generated CSV, JSON and PNG outputs
 ├── src/melquantlab/
 │   ├── backtest.py            # Signal, returns, costs and metrics
