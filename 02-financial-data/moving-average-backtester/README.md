@@ -8,7 +8,7 @@ PDF/email automation.
 > **Can a simple trend-following rule deliver a better return-to-risk outcome
 > or reduce losses compared with continuously holding SPY?**
 
-## 0. The Why — in plain English
+## 0. The Why — 
 
 - Test whether a familiar investment rule actually improves the experience of
   owning the US equity market, rather than accepting the idea on intuition.
