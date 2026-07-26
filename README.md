@@ -13,9 +13,9 @@ then market-data analysis, followed by deeper investment research.
 Observe → Question → Test → Measure → Reflect → Improve
 ```
 
-Every project must answer the same seven questions:
+Every project must answer the same six questions:
 
-0. **The Why:** In three plain-English bullets, why are we doing this?
+0. **The Why:** Why are we doing this?
 1. **What problem am I trying to solve?**
 2. **Why does this matter in financial markets?**
 3. **How did I test it?**
