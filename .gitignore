@@ -10,7 +10,9 @@ htmlcov/
 build/
 dist/
 *.egg-info/
-data/raw/*
-!data/raw/.gitkeep
-reports/*
-!reports/.gitkeep
+**/data/raw/*
+!**/data/raw/.gitkeep
+**/reports/*
+!**/reports/.gitkeep
+*.inspect.ndjson
+dashboard_preview.png
