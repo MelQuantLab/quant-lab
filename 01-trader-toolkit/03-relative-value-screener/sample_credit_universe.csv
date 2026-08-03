@@ -1,13 +1,13 @@
-identifier,issuer,sector,rating,price,yield_percent,spread_bps,maturity_years,duration,leverage
-TELCO-A,Atlas Telecom,Telecom,BB+,96.25,7.85,410,5.2,4.1,4.8
-TELCO-B,Borealis Mobile,Telecom,BB,101.10,6.90,325,4.8,3.9,4.2
-TELCO-C,Crown Networks,Telecom,BB-,94.80,8.35,455,6.1,4.7,5.6
-TELCO-D,Delta Fibre,Telecom,BB,99.20,7.15,350,5.5,4.3,4.5
-MEDIA-A,Apex Media,Media,B+,92.40,9.60,575,4.1,3.4,5.9
-MEDIA-B,Bright Studios,Media,B,97.75,8.90,510,4.7,3.8,5.3
-MEDIA-C,Cinema Group,Media,B+,100.30,8.15,455,3.9,3.2,4.8
-MEDIA-D,Digital Broadcast,Media,B-,89.60,10.75,660,5.4,4.1,6.7
-AUTO-A,Albion Motors,Automotive,BBB-,102.20,5.15,175,6.8,5.3,2.9
-AUTO-B,Britannia Auto,Automotive,BBB,98.90,5.45,205,7.2,5.6,3.4
-AUTO-C,Cascade Parts,Automotive,BBB-,95.70,6.05,255,6.5,5.0,4.1
-AUTO-D,Drive Systems,Automotive,BBB+,103.10,4.90,155,5.9,4.7,2.6
+identifier,issuer,sector,rating,price,yield_percent,spread_bps,maturity_years,duration,leverage,spread_type,issue_size_mm,average_daily_volume_mm,bid_offer_bps,carry_roll_3m_bps,downside_spread_widening_bps,catalyst_score,catalyst
+ATL-28,Atlas Telecom,Telecom,BB+,99.40,6.85,300,2.4,2.2,4.8,Z_SPREAD,650,3.2,4,15,90,0.20,Asset-sale proceeds expected
+ATL-31,Atlas Telecom,Telecom,BB+,95.20,8.10,430,5.4,4.8,4.8,Z_SPREAD,900,4.8,5,32,120,0.70,Deleveraging and refinancing catalyst
+ATL-34,Atlas Telecom,Telecom,BB,92.10,8.55,470,8.3,6.8,4.8,Z_SPREAD,700,2.7,7,38,150,0.10,Long-dated refinancing watch
+BOR-28,Borealis Mobile,Telecom,BB,98.80,7.25,350,2.1,2.0,4.2,Z_SPREAD,550,2.8,5,18,100,-0.10,Spectrum spending pressure
+BOR-31,Borealis Mobile,Telecom,BB,103.20,6.65,315,5.2,4.5,4.2,Z_SPREAD,800,4.1,4,12,125,-0.70,Capex increase and weak free cash flow
+BOR-34,Borealis Mobile,Telecom,BB-,91.50,8.70,445,8.1,6.4,4.2,Z_SPREAD,600,2.1,8,35,160,-0.20,Leverage covenant review
+APX-28,Apex Media,Media,B+,97.30,8.85,480,2.5,2.3,5.9,OAS,425,1.6,7,20,130,0.10,Content slate renewal
+APX-31,Apex Media,Media,B+,90.40,10.40,610,5.5,4.6,5.9,OAS,275,0.6,13,44,175,0.60,Streaming partnership discussions
+APX-35,Apex Media,Media,B,86.20,10.90,650,9.2,7.1,5.9,OAS,500,1.3,10,52,200,0.05,Long-dated refinancing requirement
+ALB-29,Albion Motors,Automotive,BBB-,102.10,5.05,150,3.0,2.8,2.9,Z_SPREAD,750,5.2,2,8,60,0.20,Positive model-cycle mix
+ALB-32,Albion Motors,Automotive,BBB-,96.80,6.20,250,6.2,5.2,2.9,Z_SPREAD,1000,6.4,3,22,90,0.50,Margin recovery programme
+ALB-36,Albion Motors,Automotive,BBB,101.40,5.35,235,10.1,7.4,2.9,Z_SPREAD,850,3.6,5,18,110,0.00,Neutral production outlook

@@ -60,8 +60,9 @@ with placeholder projects.
   — European option pricing, Greeks, implied volatility, scenario analysis and
   put-call parity implemented from first principles.
 - [Project 3: Credit Relative Value Screener](01-trader-toolkit/03-relative-value-screener/)
-  — an explainable cheap/rich ranking using peer spreads, leverage efficiency
-  and a risk-adjusted fair-spread residual model.
+  — a PM-style credit workflow combining peer and issuer-curve dislocations,
+  rolling z-scores, walk-forward evidence, liquidity/cost filters, risk sizing
+  and implementable same-issuer switch ideas.
 - [Project 4: Market Maker Simulator](01-trader-toolkit/04-market-maker-simulator/)
   — an interactive bid/offer game with client flow, inventory skew, adverse
   selection and marked-to-market P&L.
