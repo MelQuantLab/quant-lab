@@ -35,7 +35,8 @@ quant-lab/
 │   ├── 01-trade-calculator/
 │   ├── 02-options-analytics/
 │   ├── 03-relative-value-screener/
-│   └── 04-market-maker-simulator/
+│   ├── 04-market-maker-simulator/
+│   └── 05-bond-analytics/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
@@ -64,6 +65,9 @@ with placeholder projects.
 - [Project 4: Market Maker Simulator](01-trader-toolkit/04-market-maker-simulator/)
   — an interactive bid/offer game with client flow, inventory skew, adverse
   selection and marked-to-market P&L.
+- [Project 5: Bond Pricing, Yield & Duration](01-trader-toolkit/05-bond-analytics/)
+  — fixed-rate bond valuation, YTM solving, duration, convexity, DV01 and
+  exact interest-rate shock scenarios.
 
 ### Ten-tool target
 
@@ -73,7 +77,7 @@ The Trader Toolkit is being developed as a defined ten-project collection:
 2. Black-Scholes Options Analytics — complete
 3. Credit Relative Value Screener — complete
 4. Market Maker Simulator — complete
-5. Bond Pricing, Yield & Duration — planned
+5. Bond Pricing, Yield & Duration — complete
 6. Value-at-Risk & Stress Testing — planned
 7. Pairs Trading & Cointegration — planned
 8. Order Book & Liquidity Analyzer — planned
