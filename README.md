@@ -32,7 +32,8 @@ technical evidence needed for reproducibility.
 quant-lab/
 ├── README.md
 ├── 01-trader-toolkit/
-│   └── 01-trade-calculator/
+│   ├── 01-trade-calculator/
+│   └── 02-options-analytics/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
@@ -52,6 +53,9 @@ with placeholder projects.
 - [Project 1: Trade & Risk Analytics Calculator](01-trader-toolkit/01-trade-calculator/)
   — a tested risk workstation for execution attribution, position sizing,
   strategy expectancy, Kelly analysis and portfolio risk-limit checks.
+- [Project 2: Black-Scholes Options Analytics](01-trader-toolkit/02-options-analytics/)
+  — European option pricing, Greeks, implied volatility, scenario analysis and
+  put-call parity implemented from first principles.
 
 ### 02 — Financial Data
 
