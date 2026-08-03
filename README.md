@@ -33,7 +33,8 @@ quant-lab/
 ├── README.md
 ├── 01-trader-toolkit/
 │   ├── 01-trade-calculator/
-│   └── 02-options-analytics/
+│   ├── 02-options-analytics/
+│   └── 03-relative-value-screener/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
@@ -56,6 +57,9 @@ with placeholder projects.
 - [Project 2: Black-Scholes Options Analytics](01-trader-toolkit/02-options-analytics/)
   — European option pricing, Greeks, implied volatility, scenario analysis and
   put-call parity implemented from first principles.
+- [Project 3: Credit Relative Value Screener](01-trader-toolkit/03-relative-value-screener/)
+  — an explainable cheap/rich ranking using peer spreads, leverage efficiency
+  and a risk-adjusted fair-spread residual model.
 
 ### 02 — Financial Data
 

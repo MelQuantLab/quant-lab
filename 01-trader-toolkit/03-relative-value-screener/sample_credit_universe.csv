@@ -1,0 +1,13 @@
+identifier,issuer,sector,rating,price,yield_percent,spread_bps,maturity_years,duration,leverage
+TELCO-A,Atlas Telecom,Telecom,BB+,96.25,7.85,410,5.2,4.1,4.8
+TELCO-B,Borealis Mobile,Telecom,BB,101.10,6.90,325,4.8,3.9,4.2
+TELCO-C,Crown Networks,Telecom,BB-,94.80,8.35,455,6.1,4.7,5.6
+TELCO-D,Delta Fibre,Telecom,BB,99.20,7.15,350,5.5,4.3,4.5
+MEDIA-A,Apex Media,Media,B+,92.40,9.60,575,4.1,3.4,5.9
+MEDIA-B,Bright Studios,Media,B,97.75,8.90,510,4.7,3.8,5.3
+MEDIA-C,Cinema Group,Media,B+,100.30,8.15,455,3.9,3.2,4.8
+MEDIA-D,Digital Broadcast,Media,B-,89.60,10.75,660,5.4,4.1,6.7
+AUTO-A,Albion Motors,Automotive,BBB-,102.20,5.15,175,6.8,5.3,2.9
+AUTO-B,Britannia Auto,Automotive,BBB,98.90,5.45,205,7.2,5.6,3.4
+AUTO-C,Cascade Parts,Automotive,BBB-,95.70,6.05,255,6.5,5.0,4.1
+AUTO-D,Drive Systems,Automotive,BBB+,103.10,4.90,155,5.9,4.7,2.6
