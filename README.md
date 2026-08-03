@@ -34,7 +34,8 @@ quant-lab/
 ├── 01-trader-toolkit/
 │   ├── 01-trade-calculator/
 │   ├── 02-options-analytics/
-│   └── 03-relative-value-screener/
+│   ├── 03-relative-value-screener/
+│   └── 04-market-maker-simulator/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
@@ -60,6 +61,24 @@ with placeholder projects.
 - [Project 3: Credit Relative Value Screener](01-trader-toolkit/03-relative-value-screener/)
   — an explainable cheap/rich ranking using peer spreads, leverage efficiency
   and a risk-adjusted fair-spread residual model.
+- [Project 4: Market Maker Simulator](01-trader-toolkit/04-market-maker-simulator/)
+  — an interactive bid/offer game with client flow, inventory skew, adverse
+  selection and marked-to-market P&L.
+
+### Ten-tool target
+
+The Trader Toolkit is being developed as a defined ten-project collection:
+
+1. Trade & Risk Analytics Calculator — complete
+2. Black-Scholes Options Analytics — complete
+3. Credit Relative Value Screener — complete
+4. Market Maker Simulator — complete
+5. Bond Pricing, Yield & Duration — planned
+6. Value-at-Risk & Stress Testing — planned
+7. Pairs Trading & Cointegration — planned
+8. Order Book & Liquidity Analyzer — planned
+9. Portfolio Optimizer — planned
+10. Yield Curve & Forward Rate Analyzer — planned
 
 ### 02 — Financial Data
 
