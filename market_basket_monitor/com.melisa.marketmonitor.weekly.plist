@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.melisa.marketmonitor.weekly</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/market_basket_monitor/venv/bin/python3</string>
+    <string>/path/to/market_basket_monitor/market_monitor.py</string>
+    <string>--mode</string>
+    <string>weekly</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/path/to/market_basket_monitor</string>
+
+  <!-- Runs every Monday at 08:00 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/market_monitor_weekly.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/market_monitor_weekly.err</string>
+</dict>
+</plist>
