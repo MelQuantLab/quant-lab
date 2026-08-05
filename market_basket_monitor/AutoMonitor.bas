@@ -15,9 +15,9 @@ Attribute VB_Name = "AutoMonitor"
 ' market_basket_monitor folder on your Mac.
 ' ============================================================================
 
-Const PYTHON_PATH As String = "/Users/melisa/market_basket_monitor/venv/bin/python3"
-Const SCRIPT_DIR As String = "/Users/melisa/market_basket_monitor"
-Const DASHBOARD_PATH As String = "/Users/melisa/market_basket_monitor/basket_dashboard.xlsx"
+Const PYTHON_PATH As String = "/Users/your-username/market_basket_monitor/venv/bin/python3"
+Const SCRIPT_DIR As String = "/Users/your-username/market_basket_monitor"
+Const DASHBOARD_PATH As String = "/Users/your-username/market_basket_monitor/basket_dashboard.xlsx"
 
 Sub RefreshNow()
     RunMonitor "check", "Prices refreshed."

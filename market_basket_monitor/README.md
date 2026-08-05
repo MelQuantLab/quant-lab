@@ -52,8 +52,8 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 
 Two sample macOS `launchd` configurations are included:
 
-- `com.melisa.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
-- `com.melisa.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
+- `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
+- `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.
 
@@ -67,8 +67,8 @@ market_basket_monitor/
 ├── .env.example
 ├── AutoMonitor.bas
 ├── RunPythonMonitor.applescript
-├── com.melisa.marketmonitor.alert.plist
-└── com.melisa.marketmonitor.weekly.plist
+├── com.melquantlabs.marketmonitor.alert.plist
+└── com.melquantlabs.marketmonitor.weekly.plist
 ```
 
 Runtime files such as `.env`, `last_prices.json`, logs, and the generated Excel workbook are excluded from version control.
@@ -149,17 +149,17 @@ with the absolute location of the project on your Mac.
 Copy and load the schedules:
 
 ```bash
-cp com.melisa.marketmonitor.alert.plist ~/Library/LaunchAgents/
-cp com.melisa.marketmonitor.weekly.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.melisa.marketmonitor.alert.plist
-launchctl load ~/Library/LaunchAgents/com.melisa.marketmonitor.weekly.plist
+cp com.melquantlabs.marketmonitor.alert.plist ~/Library/LaunchAgents/
+cp com.melquantlabs.marketmonitor.weekly.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.alert.plist
+launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.weekly.plist
 ```
 
 Unload them when required:
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.melisa.marketmonitor.alert.plist
-launchctl unload ~/Library/LaunchAgents/com.melisa.marketmonitor.weekly.plist
+launchctl unload ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.alert.plist
+launchctl unload ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.weekly.plist
 ```
 
 Execution logs are written to the `/tmp` paths defined in each property-list file.

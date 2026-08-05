@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.melisa.marketmonitor.alert</string>
+  <string>com.melquantlabs.marketmonitor.alert</string>
 
   <key>ProgramArguments</key>
   <array>
