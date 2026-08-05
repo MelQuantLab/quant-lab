@@ -14,6 +14,7 @@ Run manually to test:
     python3 market_monitor.py --mode weekly
 """
 import argparse
+import html
 import json
 import os
 import smtplib
@@ -204,13 +205,17 @@ def _clear_data_rows(ws):
         ws.delete_rows(2, ws.max_row - 1)
 
 
-def update_live_sheet(wb, quotes, state, alerted_tickers):
+def update_live_sheet(wb, quotes, state, alerted_tickers, moves_since_last=None):
     ws = _ensure_sheet(wb, "Live", ["Ticker", "Price", "Day %", "Since Last Check %", "Alert", "Updated"])
     _clear_data_rows(ws)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    moves_since_last = moves_since_last or {}
     for ticker, q in quotes.items():
-        last_alert_price = state.get(ticker, {}).get("last_alert_price", q["prev_close"])
-        move_since_last = (q["price"] - last_alert_price) / last_alert_price * 100
+        reference_price = state.get(ticker, {}).get("last_price", q["prev_close"])
+        move_since_last = moves_since_last.get(
+            ticker,
+            (q["price"] - reference_price) / reference_price * 100,
+        )
         ws.append([
             ticker, round(q["price"], 2), round(q["day_pct"], 2), round(move_since_last, 2),
             "ALERT" if ticker in alerted_tickers else "", now,
@@ -257,27 +262,52 @@ def save_workbook(wb):
 
 # ---------- modes ----------
 
+def evaluate_quotes(quotes, state, threshold_pct):
+    """Update monitoring state and return newly triggered alerts and price moves."""
+    alerts = []
+    moves_since_last = {}
+
+    for ticker, quote in quotes.items():
+        ticker_state = state.setdefault(ticker, {})
+        reference_price = ticker_state.get("last_price", quote["prev_close"])
+        move_since_last = (
+            (quote["price"] - reference_price) / reference_price * 100
+        )
+        moves_since_last[ticker] = move_since_last
+
+        threshold_reached = (
+            abs(quote["day_pct"]) >= threshold_pct
+            or abs(move_since_last) >= threshold_pct
+        )
+        if threshold_reached and not ticker_state.get("alert_active", False):
+            alerts.append((ticker, quote, move_since_last))
+
+        ticker_state["alert_active"] = threshold_reached
+        ticker_state["last_price"] = quote["price"]
+
+    return alerts, moves_since_last
+
 def run_check():
     state = load_state()
     quotes = fetch_quotes(config.TICKERS)
-    alerts = []
-
-    for ticker, q in quotes.items():
-        last_alert_price = state.get(ticker, {}).get("last_alert_price", q["prev_close"])
-        move_since_last = (q["price"] - last_alert_price) / last_alert_price * 100
-
-        triggered = abs(q["day_pct"]) >= config.ALERT_THRESHOLD_PCT or abs(move_since_last) >= config.ALERT_THRESHOLD_PCT
-        if triggered:
-            alerts.append((ticker, q, move_since_last))
-            state.setdefault(ticker, {})["last_alert_price"] = q["price"]
-        state.setdefault(ticker, {})["last_price"] = q["price"]
+    alerts, moves_since_last = evaluate_quotes(
+        quotes,
+        state,
+        config.ALERT_THRESHOLD_PCT,
+    )
 
     save_state(state)
 
     # Always refresh the Excel dashboard's Live sheet, alerts or not.
     wb = _open_workbook()
     alerted_tickers = {t for t, _, _ in alerts}
-    update_live_sheet(wb, quotes, state, alerted_tickers)
+    update_live_sheet(
+        wb,
+        quotes,
+        state,
+        alerted_tickers,
+        moves_since_last,
+    )
 
     if not alerts:
         save_workbook(wb)
@@ -308,8 +338,11 @@ def run_check():
         "; ".join(f"{t}: {q['day_pct']:+.2f}%" for t, q, _ in alerts),
     )
 
-    html = "<h3>Basket alert</h3><pre>" + summary.replace("<", "&lt;") + "</pre>"
-    send_email(f"[Market Alert] {len(alerts)} move(s) in {config.BASKET_NAME}", html)
+    html_body = "<h3>Basket alert</h3><pre>" + html.escape(summary) + "</pre>"
+    send_email(
+        f"[Market Alert] {len(alerts)} move(s) in {config.BASKET_NAME}",
+        html_body,
+    )
 
 
 def run_weekly():
@@ -339,11 +372,14 @@ def run_weekly():
 
     html_parts.append("<h3>Recent news</h3>")
     for ticker, _, _, _, news in rows:
-        html_parts.append(f"<p><b>{ticker}</b></p><ul>")
+        html_parts.append(f"<p><b>{html.escape(ticker)}</b></p><ul>")
         if not news:
             html_parts.append("<li>No notable headlines this week.</li>")
         for n in news:
-            html_parts.append(f"<li><a href='{n['link']}'>{n['title']}</a></li>")
+            html_parts.append(
+                f'<li><a href="{html.escape(n["link"], quote=True)}">'
+                f'{html.escape(n["title"])}</a></li>'
+            )
         html_parts.append("</ul>")
 
     html = "\n".join(html_parts)

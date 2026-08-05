@@ -64,6 +64,7 @@ market_basket_monitor/
 ├── market_monitor.py
 ├── config.py
 ├── requirements.txt
+├── test_market_monitor.py
 ├── .env.example
 ├── AutoMonitor.bas
 ├── RunPythonMonitor.applescript
@@ -188,7 +189,7 @@ macOS may request permission for Excel to run the AppleScript helper.
 
 ## Planned development
 
-- Add automated tests for state handling, alert thresholds, and workbook generation.
+- Expand automated tests to cover data-provider failures and email delivery.
 - Separate data, reporting, delivery, and orchestration into dedicated modules.
 - Introduce market-session awareness and more precise scheduling.
 - Add richer cross-asset indicators and configurable signal rules.

@@ -40,6 +40,7 @@ quant-lab/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
+├── market_basket_monitor/
 ├── 03-quant-research/
 ├── white-papers/
 └── datasets/
@@ -90,6 +91,9 @@ The Trader Toolkit is being developed as a defined ten-project collection:
 - [Project 1: SPY 50/200 Moving-Average Backtester](02-financial-data/moving-average-backtester/)
   — a bias-aware, cost-aware comparison of a simple trend-following rule with
   continuously holding SPY.
+- [Market Basket Monitor](market_basket_monitor/)
+  — a configurable macOS workflow for market-price alerts, news monitoring,
+  weekly reporting and an automatically maintained Excel dashboard.
 
 ## Standards
 
