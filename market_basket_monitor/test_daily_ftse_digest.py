@@ -217,7 +217,61 @@ class DailyFtseDigestTests(unittest.TestCase):
         self.assertIn("What to Pay Attention To", titles)
         self.assertIn("Things We're Watching", titles)
         self.assertIn("Prepare for the Next Session", titles)
+        self.assertEqual(
+            titles[:3],
+            [
+                "What to Pay Attention To",
+                "Things We're Watching",
+                "Prepare for the Next Session",
+            ],
+        )
         self.assertLessEqual(len(summary.split()), 500)
+
+    def test_alpha_view_has_three_distinct_time_horizons(self):
+        ftse = pd.DataFrame(
+            {"company": ["Leader plc"], "day_pct": [2.5], "month_pct": [5.0]},
+            index=["LEAD.L"],
+        )
+        sectors = {"Industrials": ftse.copy(), "Financials": ftse.assign(day_pct=-1.0)}
+        property_frame = pd.DataFrame(
+            {"company": ["Property plc"], "day_pct": [0.5], "month_pct": [4.2]},
+            index=["PROP.L"],
+        )
+        ideas = digest.build_alpha_view(
+            ftse,
+            sectors,
+            property_frame,
+            pd.DataFrame(),
+            {"SONIA": {"value": 3.75}},
+            [{"title": "Company announces results", "source": "Reuters"}],
+            [{"title": "UK inflation data due"}],
+        )
+
+        self.assertEqual([idea["horizon"] for idea in ideas], ["1 Day", "1 Week", "1 Month"])
+        self.assertIn("Company announces results", ideas[0]["thesis"])
+        self.assertIn("SONIA", ideas[2]["thesis"])
+
+    def test_alpha_view_matches_headline_to_named_company(self):
+        ftse = pd.DataFrame(
+            {
+                "company": ["Index Leader", "SEGRO"],
+                "day_pct": [5.0, 1.2],
+                "month_pct": [6.0, 2.0],
+            },
+            index=["LEAD.L", "SGRO.L"],
+        )
+        ideas = digest.build_alpha_view(
+            ftse,
+            {"Industrials": ftse.iloc[[0]], "Real Estate": ftse.iloc[[1]]},
+            ftse.iloc[[1]],
+            pd.DataFrame(),
+            {},
+            [{"title": "SEGRO agrees takeover offer", "source": "Reuters"}],
+            [],
+        )
+
+        self.assertEqual(ideas[0]["title"], "Catalyst follow-through: SEGRO")
+        self.assertIn("+1.20%", ideas[0]["thesis"])
 
     @patch("daily_ftse_digest.fetch_news")
     def test_forward_watch_rejects_backward_looking_headlines(self, fetch_news):

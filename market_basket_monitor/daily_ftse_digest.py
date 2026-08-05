@@ -532,25 +532,6 @@ def collect_forward_watch(limit: int = 3) -> list[dict]:
     return sorted(stories, key=_story_rank, reverse=True)[:limit]
 
 
-def collect_sector_news(sectors: tuple[str, ...] = SECTOR_ORDER) -> dict[str, dict]:
-    """Return at most one reputable, recent headline for each broad FTSE sector."""
-    result = {}
-    for sector in sectors:
-        query = f"FTSE 100 {sector} UK companies news"
-        candidates = []
-        for raw_story in fetch_news(query, max_items=5, days_back=3):
-            story = _normalise_story(raw_story)
-            title = story["title"].lower()
-            if (
-                _story_rank(story)[0] >= 70
-                and not any(term in title for term in LOW_VALUE_HEADLINE_TERMS)
-            ):
-                candidates.append(story)
-        if candidates:
-            result[sector] = sorted(candidates, key=_story_rank, reverse=True)[0]
-    return result
-
-
 def build_pm_summary(
     ftse: pd.DataFrame,
     sector_moves: pd.DataFrame,
@@ -742,6 +723,15 @@ def build_pm_summary(
             )
         )
 
+    priority_titles = (
+        "What to Pay Attention To",
+        "Things We're Watching",
+        "Prepare for the Next Session",
+    )
+    priority = [section for title in priority_titles for section in sections if section[0] == title]
+    remaining = [section for section in sections if section[0] not in priority_titles]
+    sections = priority + remaining
+
     words = " ".join(body for _, body in sections).split()
     if len(words) > 480:
         return [("Daily Briefing", " ".join(words[:480]).rstrip(".,;:") + ".")]
@@ -836,54 +826,81 @@ def _section_title(kicker: str, title: str) -> str:
     </table>"""
 
 
-def _sector_cards(
-    sectors: dict[str, pd.DataFrame],
-    weights: dict[str, float],
-    stories: dict[str, dict],
-    weights_as_of: str,
-) -> str:
+def build_alpha_view(
+    ftse: pd.DataFrame,
+    broad_sector_frames: dict[str, pd.DataFrame],
+    real_estate: pd.DataFrame,
+    housebuilders: pd.DataFrame,
+    property_rates: dict[str, dict[str, object]],
+    news: list[dict],
+    forward_news: list[dict],
+) -> list[dict[str, str]]:
+    """Create three time-horizon research hypotheses from the latest tape and catalysts."""
+    ranked = ftse.sort_values("day_pct", ascending=False) if not ftse.empty else ftse
+    leader = ranked.iloc[0] if not ranked.empty else None
+    headline = news[0]["title"] if news else "No qualifying company catalyst was returned"
+    source = news[0].get("source") if news else "market tape"
+    company_tape = pd.concat([ftse, real_estate, housebuilders]).drop_duplicates()
+    headline_lower = headline.lower()
+    matched = company_tape[
+        company_tape["company"].astype(str).map(lambda name: name.lower() in headline_lower)
+    ] if not company_tape.empty else company_tape
+    day_name = matched.iloc[0] if not matched.empty else leader
+    day_subject = str(day_name["company"]) if day_name is not None else "FTSE leadership"
+    day_move = _format_pct(day_name["day_pct"]) if day_name is not None else "—"
+
+    sector_averages = {
+        sector: frame["day_pct"].mean()
+        for sector, frame in broad_sector_frames.items()
+        if not frame.empty
+    }
+    strongest = max(sector_averages, key=sector_averages.get) if sector_averages else "FTSE leaders"
+    weakest = min(sector_averages, key=sector_averages.get) if sector_averages else "FTSE laggards"
+    next_catalyst = forward_news[0]["title"] if forward_news else "the next UK macro and company calendar"
+
+    property_tape = pd.concat([real_estate, housebuilders]).drop_duplicates()
+    property_tape = property_tape.sort_values("month_pct", ascending=False) if not property_tape.empty else property_tape
+    property_leader = property_tape.iloc[0] if not property_tape.empty else None
+    property_name = str(property_leader["company"]) if property_leader is not None else "listed property and housebuilders"
+    property_month = _format_pct(property_leader["month_pct"]) if property_leader is not None else "—"
+    sonia = property_rates.get("SONIA", {}).get("value")
+    sonia_text = "unavailable" if sonia is None else f"{sonia:.4f}%"
+
+    return [
+        {
+            "horizon": "1 Day",
+            "title": f"Catalyst follow-through: {day_subject}",
+            "thesis": f"{headline} ({source or 'linked publisher'}). {day_subject} moved {day_move}; watch whether volume and breadth confirm the move at the next open.",
+            "risk": "The catalyst may already be priced, the headline timing may be stale, or a broader FTSE reversal may overwhelm the company signal.",
+        },
+        {
+            "horizon": "1 Week",
+            "title": f"Sector rotation: {strongest} versus {weakest}",
+            "thesis": f"{strongest} led the daily sector tape while {weakest} lagged. Test whether that spread persists or mean-reverts around {next_catalyst}.",
+            "risk": "One session does not establish a trend; macro data, earnings and index concentration can quickly reverse the relationship.",
+        },
+        {
+            "horizon": "1 Month",
+            "title": f"Rates and property repricing: {property_name}",
+            "thesis": f"{property_name} has returned {property_month} over one month while SONIA stands at {sonia_text}. Track whether easing finance conditions support property and housebuilder relative performance.",
+            "risk": "Mortgage demand, planning data, refinancing costs and company statements may diverge from the listed-equity signal.",
+        },
+    ]
+
+
+def _alpha_view_html(ideas: list[dict[str, str]]) -> str:
+    colours = {"1 Day": "#F6BD4A", "1 Week": "#46CFF5", "1 Month": "#A78BFA"}
     cards = []
-    for sector in SECTOR_ORDER:
-        frame = sectors.get(sector, pd.DataFrame()).sort_values("day_pct", ascending=False)
-        average = frame["day_pct"].mean() if not frame.empty else None
-        weight = weights.get(sector)
-        if not frame.empty:
-            leader = frame.iloc[0]
-            laggard = frame.iloc[-1]
-            tape_html = (
-                '<strong style="color:#34D6A2;">Leader:</strong> '
-                f'<strong>{html.escape(str(leader["company"]))} {_format_pct(leader["day_pct"])}</strong>. '
-                '<strong style="color:#FF6B7A;">Laggard:</strong> '
-                f'<strong>{html.escape(str(laggard["company"]))} {_format_pct(laggard["day_pct"])}</strong>.'
-            )
-        else:
-            tape_html = "No usable constituent price data was returned."
-        story = stories.get(sector)
-        if story:
-            news_line = (
-                f'<a href="{html.escape(story["link"], quote=True)}" '
-                'style="color:#46CFF5;text-decoration:none;font-weight:700;">'
-                f'{html.escape(story["title"])}</a>'
-                f'<span style="color:#71869C;"> — {html.escape(story.get("source") or "publisher")}</span>'
-            )
-        else:
-            news_line = (
-                '<span style="color:#8EA5BD;">No qualifying sector-specific headline was returned; '
-                'price action is the primary daily signal.</span>'
-            )
+    for idea in ideas:
+        colour = colours.get(idea["horizon"], "#F6BD4A")
         cards.append(
             '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" '
             'style="background:#102A47;border:1px solid #31567E;border-radius:12px;margin:10px 0;">'
             '<tr><td style="padding:16px 18px;">'
-            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>'
-            f'<td style="color:#F7FAFC;font-size:17px;font-weight:800;">{html.escape(sector)}</td>'
-            f'<td align="right" style="color:#F6BD4A;font-size:13px;font-weight:800;">'
-            f'{"—" if weight is None else f"{weight:.1f}% weight"}</td></tr></table>'
-            f'<div style="color:{_move_colour(average)};font-size:14px;font-weight:800;margin-top:8px;">'
-            f'Daily constituent average {_format_pct(average)}</div>'
-            f'<div style="color:#DCE8F4;font-size:13px;line-height:1.55;margin-top:6px;">{tape_html}</div>'
-            f'<div style="font-size:12px;line-height:1.5;margin-top:8px;">{news_line}</div>'
-            f'<div style="color:#607990;font-size:9px;margin-top:8px;">Weight proxy: iShares ISF holdings, {html.escape(weights_as_of)}</div>'
+            f'<div style="color:{colour};font-size:10px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;">{html.escape(idea["horizon"])}</div>'
+            f'<div style="color:#F7FAFC;font-size:17px;font-weight:800;margin-top:5px;">{html.escape(idea["title"])}</div>'
+            f'<div style="color:#DCE8F4;font-size:13px;line-height:1.55;margin-top:8px;"><strong>Hypothesis:</strong> {html.escape(idea["thesis"])}</div>'
+            f'<div style="color:#9FB0C5;font-size:12px;line-height:1.5;margin-top:7px;"><strong style="color:#FF9AA5;">Key risk:</strong> {html.escape(idea["risk"])}</div>'
             '</td></tr></table>'
         )
     return "".join(cards)
@@ -971,15 +988,6 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     )
     news = collect_ranked_news(news_names)
     forward_news = collect_forward_watch()
-    sector_news = collect_sector_news()
-    for story in news:
-        title = story["title"].lower()
-        for sector, frame in broad_sector_frames.items():
-            if sector in sector_news or frame.empty:
-                continue
-            if any(str(company).lower() in title for company in frame["company"]):
-                sector_news[sector] = story
-
     ftse_index_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
 
     news_html = "".join(
@@ -1035,8 +1043,16 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         "build costs and buyer demand together—no single share-price move is a development decision."
     )
     sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
-    sector_cards_html = _sector_cards(
-        broad_sector_frames, sector_weights, sector_news, sector_weights_as_of
+    alpha_view_html = _alpha_view_html(
+        build_alpha_view(
+            ftse,
+            broad_sector_frames,
+            real_estate,
+            housebuilders,
+            property_rates,
+            news,
+            forward_news,
+        )
     )
     weight_strip = " · ".join(
         f"{sector} {weight:.1f}%"
@@ -1164,8 +1180,9 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #46CFF5;border-radius:10px;margin:10px 5px 16px;">
       <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Lotus Noor Developments Focus Lens:</strong> {html.escape(property_read)}</td></tr>
     </table>
-    {_section_title('Investment house view', 'FTSE 100 Sector Intelligence')}
-    {sector_cards_html}
+    {_section_title('Research hypotheses', 'Alpha View')}
+    {alpha_view_html}
+    <div style="color:#71869C;font-size:10px;line-height:1.5;margin:8px 0 22px;">Research hypotheses for monitoring only—not recommendations or personal investment advice. Verify market data, news and catalyst timing at source.</div>
     {_section_title('Cross-market context', 'Drivers dashboard')}
     {_table(drivers, columns)}
     {_section_title('Portfolio manager close', 'Daily PM Summary')}
