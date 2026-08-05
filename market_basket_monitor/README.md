@@ -98,10 +98,10 @@ Open `.env` and enter the email account details used for delivery:
 BT_EMAIL_USER=your-email@example.com
 BT_EMAIL_PASSWORD=your-app-password
 EMAIL_FROM=your-email@example.com
-EMAIL_TO=your-email@example.com
+EMAIL_TO=first-recipient@example.com,second-recipient@example.com
 ```
 
-Keep `.env` private. It is already excluded by `.gitignore` and should never be committed.
+Separate multiple recipients with commas. Keep `.env` private: it is already excluded by `.gitignore` and should never be committed.
 
 ## Configuration
 
