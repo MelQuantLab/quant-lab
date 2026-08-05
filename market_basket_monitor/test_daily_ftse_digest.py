@@ -31,6 +31,16 @@ class DailyFtseDigestTests(unittest.TestCase):
 
         self.assertEqual(result.loc["TEST.L", "company"], "TEST.L")
 
+    def test_move_colours_distinguish_direction(self):
+        self.assertEqual(digest._move_colour(1.0), "#34D6A2")
+        self.assertEqual(digest._move_colour(-1.0), "#FF6B7A")
+
+    def test_metric_card_contains_label_and_value(self):
+        card = digest._metric_card("FTSE 100", "+1.25%", "#34D6A2", "market close")
+        self.assertIn("FTSE 100", card)
+        self.assertIn("+1.25%", card)
+        self.assertIn("market close", card)
+
 
 if __name__ == "__main__":
     unittest.main()

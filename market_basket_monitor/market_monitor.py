@@ -21,6 +21,8 @@ import smtplib
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
@@ -153,7 +155,7 @@ def send_macos_notification(title, message):
         pass  # not on macOS
 
 
-def send_email(subject, html_body):
+def send_email(subject, html_body, inline_images=None):
     host = os.environ.get("SMTP_HOST")
     port = int(os.environ.get("SMTP_PORT", "587"))
     security = os.environ.get("SMTP_SECURITY", "starttls").lower()
@@ -165,7 +167,20 @@ def send_email(subject, html_body):
         print("[error] Email settings are incomplete (check your .env file). "
               "Skipping email send.", file=sys.stderr)
         return
-    msg = MIMEText(html_body, "html")
+    if inline_images:
+        msg = MIMEMultipart("related")
+        alternative = MIMEMultipart("alternative")
+        alternative.attach(MIMEText("This briefing requires an HTML-capable email client.", "plain"))
+        alternative.attach(MIMEText(html_body, "html"))
+        msg.attach(alternative)
+        for content_id, image_path in inline_images.items():
+            with open(image_path, "rb") as image_file:
+                image_part = MIMEImage(image_file.read())
+            image_part.add_header("Content-ID", f"<{content_id}>")
+            image_part.add_header("Content-Disposition", "inline", filename=Path(image_path).name)
+            msg.attach(image_part)
+    else:
+        msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
     msg["From"] = email_from
     msg["To"] = email_to

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent
 CONSTITUENT_CACHE = BASE_DIR / "ftse100_constituents.json"
 HTML_OUTPUT = BASE_DIR / "daily_ftse_digest.html"
 WORKBOOK_OUTPUT = BASE_DIR / "daily_ftse_dashboard.xlsx"
+LOGO_PATH = BASE_DIR / "assets" / "melquantlab-logo.jpg"
 FTSE_SOURCE = "https://en.wikipedia.org/wiki/FTSE_100_Index"
 
 UK_AUTOS = {
@@ -218,29 +220,79 @@ def _format_pct(value) -> str:
     return "—" if pd.isna(value) else f"{value:+.2f}%"
 
 
+def _move_colour(value) -> str:
+    if pd.isna(value):
+        return "#9FB0C5"
+    if value > 0:
+        return "#34D6A2"
+    if value < 0:
+        return "#FF6B7A"
+    return "#F7FAFC"
+
+
 def _table(frame: pd.DataFrame, columns: list[tuple[str, str]], limit=None) -> str:
     if frame.empty:
-        return "<p>No usable market data was returned.</p>"
+        return '<p style="color:#9FB0C5;margin:12px 0 22px;">No usable market data was returned.</p>'
     shown = frame.head(limit) if limit else frame
-    header = "".join(f"<th>{html.escape(label)}</th>" for _, label in columns)
+    header = "".join(
+        '<th style="background:#17395F;color:#D9E6F3;font-size:11px;letter-spacing:.5px;'
+        f'text-transform:uppercase;padding:10px 9px;text-align:left;border-bottom:1px solid #31567E;">{html.escape(label)}</th>'
+        for _, label in columns
+    )
     rows = []
-    for ticker, row in shown.iterrows():
+    for row_number, (ticker, row) in enumerate(shown.iterrows()):
         cells = []
         for column, _ in columns:
+            cell_colour = "#ECF4FC"
+            weight = "500"
             if column == "ticker":
                 value = ticker
             elif column in {"day_pct", "week_pct", "month_pct"}:
-                value = _format_pct(row.get(column))
+                raw_value = row.get(column)
+                value = _format_pct(raw_value)
+                cell_colour = _move_colour(raw_value)
+                weight = "700"
             elif column == "volume_ratio":
                 ratio = row.get(column)
                 value = "—" if pd.isna(ratio) else f"{ratio:.1f}x"
+                if not pd.isna(ratio) and ratio >= 2:
+                    cell_colour = "#F6BD4A"
+                    weight = "700"
             elif column == "price":
                 value = f"{row.get(column):.2f}"
             else:
                 value = str(row.get(column, ""))
-            cells.append(f"<td>{html.escape(value)}</td>")
+            background = "#102A47" if row_number % 2 == 0 else "#0D243E"
+            cells.append(
+                f'<td style="background:{background};color:{cell_colour};font-size:13px;'
+                f'font-weight:{weight};padding:10px 9px;border-bottom:1px solid #274766;">'
+                f'{html.escape(value)}</td>'
+            )
         rows.append("<tr>" + "".join(cells) + "</tr>")
-    return f"<table><thead><tr>{header}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+    return (
+        '<table class="data-table" role="presentation" cellspacing="0" cellpadding="0" width="100%" '
+        'style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;margin:10px 0 24px;border:1px solid #274766;'
+        f'border-radius:10px;overflow:hidden;"><thead><tr>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+    )
+
+
+def _metric_card(label: str, value: str, colour: str, note: str = "") -> str:
+    return f"""
+    <td class="metric-cell" width="25%" valign="top" style="padding:5px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#112C4A;border:1px solid #2B4F73;border-radius:12px;">
+        <tr><td style="padding:14px 14px 4px;color:#8EA5BD;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">{html.escape(label)}</td></tr>
+        <tr><td style="padding:0 14px;color:{colour};font-size:24px;font-weight:700;line-height:1.2;">{html.escape(value)}</td></tr>
+        <tr><td style="padding:5px 14px 14px;color:#8EA5BD;font-size:10px;">{html.escape(note)}</td></tr>
+      </table>
+    </td>"""
+
+
+def _section_title(kicker: str, title: str) -> str:
+    return f"""
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:28px;">
+      <tr><td style="color:#F6BD4A;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding-bottom:5px;">{html.escape(kicker)}</td></tr>
+      <tr><td style="color:#F7FAFC;font-size:23px;font-weight:700;line-height:1.2;padding-bottom:9px;border-bottom:1px solid #345675;">{html.escape(title)}</td></tr>
+    </table>"""
 
 
 def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
@@ -283,12 +335,19 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     relative = auto_move - ftse_index_move if auto_move is not None and ftse_index_move is not None else None
 
     news_html = "".join(
-        "<li><strong>"
-        + html.escape(story["title"])
-        + "</strong><br><span>Why it matters: potential market or automotive-sector catalyst.</span> "
-        + f'<a href="{html.escape(story["link"], quote=True)}">Source</a></li>'
-        for story in news
-    ) or "<li>No qualifying recent stories were returned.</li>"
+        f"""
+        <tr>
+          <td width="42" valign="top" style="padding:12px 0;">
+            <div style="width:30px;height:30px;line-height:30px;text-align:center;background:#F6BD4A;color:#07121F;border-radius:15px;font-size:12px;font-weight:800;">{number:02d}</div>
+          </td>
+          <td valign="top" style="padding:12px 0;border-bottom:1px solid #294B6B;">
+            <div style="color:#F7FAFC;font-size:15px;font-weight:700;line-height:1.35;">{html.escape(story["title"])}</div>
+            <div style="color:#9FB0C5;font-size:12px;line-height:1.45;margin-top:5px;">Potential market or automotive-sector catalyst. Verify the detail and timing at source.</div>
+            <a href="{html.escape(story["link"], quote=True)}" style="display:inline-block;color:#46CFF5;font-size:12px;font-weight:700;text-decoration:none;margin-top:7px;">READ SOURCE →</a>
+          </td>
+        </tr>"""
+        for number, story in enumerate(news, start=1)
+    ) or '<tr><td style="color:#9FB0C5;padding:16px 0;">No qualifying recent stories were returned.</td></tr>'
 
     columns = [
         ("company", "Company"),
@@ -304,28 +363,98 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         if auto_move is not None
         else "Auto Trader data was unavailable."
     )
+    ftse_move = ftse_index_move
+    advancers = int((ftse["day_pct"] > 0).sum())
+    decliners = int((ftse["day_pct"] < 0).sum())
+    leader_name = str(gainers.iloc[0]["company"]) if not gainers.empty else "—"
+    leader_move = gainers.iloc[0]["day_pct"] if not gainers.empty else None
+    laggard_name = str(fallers.iloc[0]["company"]) if not fallers.empty else "—"
+    laggard_move = fallers.iloc[0]["day_pct"] if not fallers.empty else None
+    brent_move = drivers.loc["BZ=F", "day_pct"] if "BZ=F" in drivers.index else None
+    auto_week = auto_row.iloc[0]["week_pct"] if not auto_row.empty else None
+    auto_month = auto_row.iloc[0]["month_pct"] if not auto_row.empty else None
+    auto_volume = auto_row.iloc[0]["volume_ratio"] if not auto_row.empty else None
+    auto_price = auto_row.iloc[0]["price"] if not auto_row.empty else None
+    sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
+    logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    logo_src = f"data:image/jpeg;base64,{logo_data}"
+
     document = f"""<!doctype html>
-<html><head><meta charset="utf-8"><style>
-body{{font-family:Arial,sans-serif;color:#17263c;max-width:1000px;margin:auto;padding:24px}}
-h1{{color:#17365d}} h2{{border-bottom:2px solid #d9a441;padding-bottom:6px}}
-table{{border-collapse:collapse;width:100%;margin:12px 0 24px}} th{{background:#17365d;color:white}}
-th,td{{padding:8px;border:1px solid #d8dee8;text-align:left}} tr:nth-child(even){{background:#f4f7fa}}
-.card{{background:#eef4f8;border-left:5px solid #2878b5;padding:14px;margin:12px 0}}
-.small{{font-size:12px;color:#5f6875}}</style></head><body>
-<h1>Melquant Labs Daily Autos &amp; FTSE Close</h1>
-<p class="small">Generated {html.escape(generated)}</p>
-<div class="card"><strong>Auto Trader:</strong> {html.escape(auto_summary)}</div>
-<h2>FTSE 100 top five gainers</h2>{_table(gainers, columns)}
-<h2>FTSE 100 top five fallers</h2>{_table(fallers, columns)}
-<h2>Notable FTSE 100 moves</h2>{_table(notable, columns)}
-<h2>Three notable stories</h2><ol>{news_html}</ol>
-<h2>Auto Trader</h2>{_table(auto_row, columns)}
-<h2>UK automotive basket</h2>{_table(uk_autos.sort_values('day_pct', ascending=False), columns)}
-<h2>Global automotive peers</h2>{_table(global_autos.sort_values('day_pct', ascending=False), columns)}
-<h2>FTSE sector heatmap</h2>{_table(sector_moves, [('ticker','Sector'),('day_pct','Average move')])}
-<h2>Market drivers</h2>{_table(drivers, columns)}
-<p class="small">Public-data research aid only. Prices may be delayed or revised. Headlines are automatically selected and should be verified at source. This is not investment advice.</p>
-</body></html>"""
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@media only screen and (max-width:620px) {{
+  .shell {{ width:100% !important; border-radius:0 !important; }}
+  .content-pad {{ padding:18px 12px 8px !important; }}
+  .header-pad {{ padding:20px 16px !important; }}
+  .footer-pad {{ padding:18px 16px !important; }}
+  .metric-cell {{ display:block !important; width:100% !important; box-sizing:border-box !important; }}
+  .data-table {{ table-layout:fixed !important; }}
+  .data-table th, .data-table td {{ padding:8px 4px !important; font-size:10px !important; overflow-wrap:anywhere !important; }}
+  .headline {{ font-size:23px !important; }}
+}}
+</style></head>
+<body style="margin:0;padding:0;background:#050D17;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#F7FAFC;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#050D17;"><tr><td align="center" style="padding:22px 10px;">
+<table class="shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:760px;background:#091827;border:1px solid #1D3C5C;border-radius:20px;overflow:hidden;">
+  <tr><td class="header-pad" style="background:#07121F;padding:24px 30px;border-bottom:1px solid #254A6B;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+      <td width="92" valign="middle"><img src="{logo_src}" alt="Melquant Labs" width="76" height="76" style="display:block;border-radius:38px;border:1px solid #F6BD4A;"></td>
+      <td valign="middle">
+        <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Autos Intelligence</div>
+        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">Daily Autos &amp; FTSE Close</div>
+        <div style="color:#8EA5BD;font-size:12px;margin-top:7px;">{html.escape(generated)} · ANALYZE <span style="color:#F6BD4A;">•</span> MODEL <span style="color:#46CFF5;">•</span> ALPHA</div>
+      </td>
+    </tr></table>
+  </td></tr>
+  <tr><td class="content-pad" style="padding:22px 25px 10px;">
+    <div style="color:#8EA5BD;font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;margin:0 5px 5px;">Market pulse</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+      {_metric_card('FTSE 100', _format_pct(ftse_move), _move_colour(ftse_move), f'{advancers} up / {decliners} down')}
+      {_metric_card('Auto Trader', _format_pct(auto_move), _move_colour(auto_move), f'{_format_pct(relative)} vs FTSE')}
+      {_metric_card('Brent', _format_pct(brent_move), _move_colour(brent_move), 'autos input signal')}
+      {_metric_card('Notable moves', str(len(notable)), '#F6BD4A', 'price or volume flags')}
+    </tr></table>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #F6BD4A;border-radius:10px;margin:14px 5px 0;">
+      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:14px;line-height:1.5;"><strong style="color:#FFFFFF;">Desk read:</strong> {html.escape(auto_summary)} <strong style="color:#34D6A2;">Leader:</strong> {html.escape(leader_name)} {_format_pct(leader_move)}. <strong style="color:#FF6B7A;">Laggard:</strong> {html.escape(laggard_name)} {_format_pct(laggard_move)}.</td></tr>
+    </table>
+
+    {_section_title('Priority coverage', 'Auto Trader spotlight')}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0 5px;"><tr>
+      {_metric_card('Price', '—' if auto_price is None else f'{auto_price:.2f}', '#F7FAFC', 'latest close')}
+      {_metric_card('1 day', _format_pct(auto_move), _move_colour(auto_move), 'absolute move')}
+      {_metric_card('5 days', _format_pct(auto_week), _move_colour(auto_week), 'weekly trend')}
+      {_metric_card('1 month', _format_pct(auto_month), _move_colour(auto_month), 'medium trend')}
+    </tr></table>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+      <td width="50%" style="padding:5px;"><div style="background:#112C4A;border:1px solid #2B4F73;border-radius:10px;padding:13px;color:#9FB0C5;font-size:11px;">RELATIVE TO FTSE 100<br><strong style="color:{_move_colour(relative)};font-size:20px;">{_format_pct(relative)}</strong></div></td>
+      <td width="50%" style="padding:5px;"><div style="background:#112C4A;border:1px solid #2B4F73;border-radius:10px;padding:13px;color:#9FB0C5;font-size:11px;">VOLUME VS 20-DAY<br><strong style="color:#46CFF5;font-size:20px;">{'—' if pd.isna(auto_volume) else f'{auto_volume:.1f}x'}</strong></div></td>
+    </tr></table>
+
+    {_section_title('FTSE 100 tape', 'Leaders')}
+    {_table(gainers, columns)}
+    {_section_title('FTSE 100 tape', 'Laggards')}
+    {_table(fallers, columns)}
+    {_section_title('Catalyst radar', 'Three stories that matter')}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:7px 0 18px;">{news_html}</table>
+    {_section_title('Signal monitor', 'Notable FTSE 100 moves')}
+    {_table(notable, columns)}
+    {_section_title('UK autos', 'Domestic automotive tape')}
+    {_table(uk_autos.sort_values('day_pct', ascending=False), columns)}
+    {_section_title('Global autos', 'OEM and peer pulse')}
+    {_table(global_autos.sort_values('day_pct', ascending=False), columns)}
+    {_section_title('Cross-market context', 'Sector leadership')}
+    {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')])}
+    {_section_title('Cross-market context', 'Drivers dashboard')}
+    {_table(drivers, columns)}
+  </td></tr>
+  <tr><td class="footer-pad" style="background:#07121F;padding:22px 30px;border-top:1px solid #254A6B;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+      <td valign="middle" style="color:#F6BD4A;font-size:12px;font-weight:800;letter-spacing:1px;">MELQUANT LABS</td>
+      <td align="right" style="color:#71869C;font-size:10px;line-height:1.5;">Public-data research aid only.<br>Verify prices and headlines at source. Not investment advice.</td>
+    </tr></table>
+  </td></tr>
+</table></td></tr></table></body></html>"""
     frames = {
         "FTSE 100": ftse,
         "UK Autos": uk_autos,
@@ -368,7 +497,15 @@ def main() -> None:
     print(f"[ok] Excel dashboard written: {WORKBOOK_OUTPUT}")
     if not args.dry_run:
         subject_date = datetime.now().strftime("%d %b %Y")
-        send_email(f"Melquant Labs Daily Autos & FTSE Close | {subject_date}", document)
+        email_document = document.replace(
+            f"data:image/jpeg;base64,{base64.b64encode(LOGO_PATH.read_bytes()).decode('ascii')}",
+            "cid:melquantlabs-logo",
+        )
+        send_email(
+            f"Melquant Labs Closing Bell | Autos & FTSE | {subject_date}",
+            email_document,
+            inline_images={"melquantlabs-logo": LOGO_PATH},
+        )
 
 
 if __name__ == "__main__":
