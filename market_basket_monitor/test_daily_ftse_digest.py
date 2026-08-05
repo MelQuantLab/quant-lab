@@ -103,6 +103,23 @@ class DailyFtseDigestTests(unittest.TestCase):
         self.assertEqual(story["title"], "UK shares close higher")
         self.assertEqual(story["source"], "Reuters")
 
+    @patch("daily_ftse_digest.fetch_news")
+    def test_ranked_news_rejects_clickbait_even_from_known_platform(self, fetch_news):
+        fetch_news.return_value = [
+            {
+                "title": "Here's 1 REIT I'm buying for juicy dividends! - Yahoo Finance UK",
+                "link": "https://example.com/clickbait",
+            },
+            {
+                "title": "Housebuilder reports annual results - Reuters",
+                "link": "https://example.com/reuters",
+            },
+        ]
+
+        stories = digest.collect_ranked_news(["Housebuilder"])
+
+        self.assertEqual([story["source"] for story in stories], ["Reuters"])
+
     def test_pm_summary_is_concise_and_data_led(self):
         ftse = pd.DataFrame(
             {
@@ -117,9 +134,26 @@ class DailyFtseDigestTests(unittest.TestCase):
         drivers = pd.DataFrame(
             {"day_pct": [0.5, -1.0]}, index=["^FTSE", "BZ=F"]
         )
-        auto = pd.DataFrame(
-            {"day_pct": [1.0], "week_pct": [2.0]}, index=["AUTO.L"]
+        banks = pd.DataFrame(
+            {"company": ["Lloyds"], "day_pct": [1.0]}, index=["LLOY.L"]
         )
+        materials = pd.DataFrame(
+            {"company": ["Copper"], "day_pct": [2.0]}, index=["HG=F"]
+        )
+        real_estate = pd.DataFrame(
+            {"company": ["Landsec"], "day_pct": [0.8]}, index=["LAND.L"]
+        )
+        housebuilders = pd.DataFrame(
+            {"company": ["Persimmon"], "day_pct": [-0.5]}, index=["PSN.L"]
+        )
+        consumers = pd.DataFrame(
+            {"company": ["Next", "Tesco"], "day_pct": [0.4, -0.2]},
+            index=["NXT.L", "TSCO.L"],
+        )
+        rates = {
+            "SONIA": {"value": 3.7321, "as_of": "03 Aug 2026"},
+            "Bank Rate": {"value": 3.75, "as_of": "04 Aug 2026"},
+        }
         news = [
             {
                 "title": "Company issues trading update",
@@ -129,13 +163,24 @@ class DailyFtseDigestTests(unittest.TestCase):
         ]
 
         sections = digest.build_pm_summary(
-            ftse, sectors, drivers, auto, news, forward_news=[]
+            ftse,
+            sectors,
+            drivers,
+            banks,
+            materials,
+            real_estate,
+            housebuilders,
+            consumers,
+            rates,
+            news,
+            forward_news=[],
         )
         titles = [title for title, _ in sections]
         summary = " ".join(body for _, body in sections)
 
         self.assertIn("Winner plc", summary)
-        self.assertIn("Auto Trader", summary)
+        self.assertIn("SONIA", summary)
+        self.assertIn("housebuilders", summary)
         self.assertIn("Reuters", summary)
         self.assertIn("Today's Market", titles)
         self.assertIn("What to Pay Attention To", titles)

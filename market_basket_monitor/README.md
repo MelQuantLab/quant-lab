@@ -2,9 +2,9 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
-It also includes a weekday FTSE 100, automotive and property closing briefing with market leaders and laggards, unusual moves, three notable headlines, an Auto Trader company card, UK and global automotive peers, sector performance, key market drivers and a sub-500-word portfolio-manager closing summary. A dedicated Lotus Knor property lens tracks relevant FTSE real-estate, housebuilding and construction names alongside official Bank of England SONIA and Bank Rate observations, UK gilts and sterling.
+It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The briefing starts with the full-index market pulse, leaders, laggards and notable news, then maps the market directly to a developer's decisions: capital and finance, materials and infrastructure, real-estate bellwethers, housebuilder competition, consumer spending power and the next-session watchlist. A sub-500-word closing note converts the data into a concise Lotus Knor read-through.
 
-The project currently uses Auto Trader Group (`AUTO.L`) as a simple starting example. The basket can be expanded to include other equities, indices, exchange-traded funds, or Yahoo Finance instruments.
+The configurable intraday alert monitor still uses Auto Trader Group (`AUTO.L`) as its simple example basket. It is independent of the property-focused daily closing briefing and can be expanded to other instruments.
 
 ## Project purpose
 
@@ -55,7 +55,7 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 Three sample macOS `launchd` configurations are included:
 
 - `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
-- `com.melquantlabs.marketmonitor.daily.plist` sends the FTSE 100, autos and property briefing at 17:30, Monday to Friday.
+- `com.melquantlabs.marketmonitor.daily.plist` sends the FTSE 100 property-developer briefing at 17:30, Monday to Friday.
 - `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.
@@ -141,7 +141,7 @@ Generate the weekly dashboard update and email digest:
 python3 market_monitor.py --mode weekly
 ```
 
-Build the daily FTSE 100, autos and property briefing without sending it:
+Build the daily FTSE 100 property-developer briefing without sending it:
 
 ```bash
 python3 daily_ftse_digest.py --dry-run
@@ -201,7 +201,9 @@ macOS may request permission for Excel to run the AppleScript helper.
 
 - Price data is provided by Yahoo Finance through `yfinance` and may be delayed, incomplete, or revised.
 - News is discovered through Google News RSS, attributed to its publisher and ranked to favour sources such as Reuters, Bloomberg, the Financial Times, Yahoo Finance and established UK outlets. Availability varies and paywalled article text is not bypassed.
-- The Daily PM Summary combines the calculated market tape with attributed headlines. Forward-looking headlines are included only when they are explicitly relevant to the UK market or automotive sector; otherwise the report supplies a general watchlist and asks the reader to verify dates at the company or exchange.
+- Official SONIA and Bank Rate observations come from the Bank of England statistical database and display their observation dates.
+- The Daily PM Summary combines the calculated FTSE tape with financing, property, housebuilder, materials and consumer proxies plus attributed headlines. Forward-looking headlines are included only when explicitly relevant to the UK market or property-development environment; otherwise the report supplies a general watchlist and asks the reader to verify dates at the original source.
+- Planning approvals, mortgage approvals, CPI, wages and RICS surveys update less frequently than markets. They are treated as dated release-watch items rather than fabricated daily readings.
 - The monitor runs locally and therefore depends on the Mac being powered on with network access.
 - It is a research and monitoring tool, not an execution system or source of investment advice.
 - The current version uses a straightforward percentage threshold rather than a statistically calibrated risk model.

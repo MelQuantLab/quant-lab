@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and optionally email a daily FTSE 100 and automotive-sector briefing."""
+"""Build and optionally email a property-focused daily FTSE 100 briefing."""
 
 from __future__ import annotations
 
@@ -29,26 +29,51 @@ LOGO_PATH = BASE_DIR / "assets" / "melquantlab-logo.jpg"
 FTSE_SOURCE = "https://en.wikipedia.org/wiki/FTSE_100_Index"
 BOE_DATA_URL = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp"
 
-UK_AUTOS = {
-    "AUTO.L": "Auto Trader",
-    "INCH.L": "Inchcape",
-    "MOTR.L": "Motorpoint",
-    "PINE.L": "Pinewood Technologies",
-    "AML.L": "Aston Martin Lagonda",
+CAPITAL_FINANCE = {
+    "HSBA.L": "HSBC",
+    "BARC.L": "Barclays",
+    "LLOY.L": "Lloyds Banking Group",
+    "NWG.L": "NatWest Group",
 }
 
-GLOBAL_AUTOS = {
-    "BMW.DE": "BMW",
-    "MBG.DE": "Mercedes-Benz",
-    "VOW3.DE": "Volkswagen",
-    "STLAM.MI": "Stellantis",
-    "RNO.PA": "Renault",
-    "RACE.MI": "Ferrari",
-    "VOLCAR-B.ST": "Volvo Cars",
-    "TSLA": "Tesla",
-    "GM": "General Motors",
-    "F": "Ford",
+REAL_ESTATE_BELLWETHERS = {
+    "SGRO.L": "Segro",
+    "LAND.L": "Land Securities",
+    "BLND.L": "British Land",
+    "LMP.L": "LondonMetric Property",
+    "BBOX.L": "Tritax Big Box REIT",
 }
+
+HOUSEBUILDERS = {
+    "BTRW.L": "Barratt Redrow",
+    "PSN.L": "Persimmon",
+    "TW.L": "Taylor Wimpey",
+    "BKG.L": "Berkeley Group",
+    "VTY.L": "Vistry Group",
+    "BWY.L": "Bellway",
+}
+
+MATERIALS_INFRASTRUCTURE = {
+    "HWDN.L": "Howdens Joinery",
+    "BREE.L": "Breedon Group",
+    "RIO.L": "Rio Tinto",
+    "GLEN.L": "Glencore",
+    "AAL.L": "Anglo American",
+    "CRH": "CRH (external bellwether)",
+    "HG=F": "Copper futures",
+}
+
+CONSUMER_HEALTH = {
+    "NXT.L": "Next",
+    "MKS.L": "Marks & Spencer",
+    "KGF.L": "Kingfisher",
+    "TSCO.L": "Tesco",
+    "SBRY.L": "Sainsbury's",
+    "ULVR.L": "Unilever",
+}
+
+CONSUMER_DISCRETIONARY = {"NXT.L", "MKS.L", "KGF.L"}
+CONSUMER_STAPLES = {"TSCO.L", "SBRY.L", "ULVR.L"}
 
 MARKET_DRIVERS = {
     "^FTSE": "FTSE 100",
@@ -260,17 +285,33 @@ def notable_moves(snapshot: pd.DataFrame) -> pd.DataFrame:
 
 
 TRUSTED_NEWS_SOURCES = {
+    "bank of england": 100,
+    "office for national statistics": 100,
     "reuters": 100,
     "financial times": 95,
     "bloomberg": 95,
+    "gov.uk": 95,
+    "london stock exchange": 90,
+    "rics": 90,
     "yahoo finance": 90,
     "bbc": 85,
     "sky news": 80,
     "the guardian": 75,
     "city a.m.": 75,
+    "property week": 75,
+    "the construction index": 75,
     "this is money": 70,
     "proactive investors": 65,
 }
+
+LOW_VALUE_HEADLINE_TERMS = (
+    "i'm buying",
+    "i’m buying",
+    "juicy dividends",
+    "should you buy",
+    "could make you rich",
+    "passive income stock",
+)
 
 
 def _normalise_story(story: dict) -> dict:
@@ -300,20 +341,29 @@ def _story_rank(story: dict) -> tuple[int, float]:
 
 def collect_ranked_news(company_names: list[str], limit: int = 3) -> list[dict]:
     """Collect and rank recent headlines from reputable publishers."""
-    queries = ["FTSE 100 earnings CEO trading update"]
+    queries = [
+        "FTSE 100 earnings CEO trading update",
+        "UK property housebuilders mortgage rates construction Reuters Bloomberg Financial Times",
+        "UK banks lending housing market materials prices",
+    ]
     queries.extend(company_names[:5])
-    queries.append("Auto Trader UK automotive market")
     stories = []
     seen = set()
     for query in queries:
-        for raw_story in fetch_news(query, max_items=5, days_back=2):
+        for raw_story in fetch_news(query, max_items=5, days_back=5):
             story = _normalise_story(raw_story)
             key = story["title"].lower().strip()
             if key in seen:
                 continue
             seen.add(key)
             stories.append(story)
-    return sorted(stories, key=_story_rank, reverse=True)[:limit]
+    reputable = [
+        story
+        for story in stories
+        if _story_rank(story)[0] >= 70
+        and not any(term in story["title"].lower() for term in LOW_VALUE_HEADLINE_TERMS)
+    ]
+    return sorted(reputable, key=_story_rank, reverse=True)[:limit]
 
 
 def collect_forward_watch(limit: int = 3) -> list[dict]:
@@ -339,16 +389,19 @@ def collect_forward_watch(limit: int = 3) -> list[dict]:
         "british",
         "london",
         "sterling",
-        "auto trader",
-        "automotive",
-        "car ",
-        "vehicle",
-        "smmt",
+        "property",
+        "housing",
+        "housebuilder",
+        "mortgage",
+        "bank of england",
+        "construction",
+        "planning",
+        "rics",
     )
     queries = [
         "FTSE 100 earnings this week outlook Reuters OR Bloomberg OR Financial Times",
         "UK market week ahead earnings economic data",
-        "UK automotive industry outlook Auto Trader SMMT",
+        "UK property housing construction week ahead rates planning RICS",
     ]
     stories = []
     seen = set()
@@ -372,11 +425,16 @@ def build_pm_summary(
     ftse: pd.DataFrame,
     sector_moves: pd.DataFrame,
     drivers: pd.DataFrame,
-    auto_row: pd.DataFrame,
+    banks: pd.DataFrame,
+    materials: pd.DataFrame,
+    real_estate: pd.DataFrame,
+    housebuilders: pd.DataFrame,
+    consumers: pd.DataFrame,
+    property_rates: dict[str, dict[str, object]],
     news: list[dict],
     forward_news: list[dict],
 ) -> list[tuple[str, str]]:
-    """Create a concise, data-led closing note capped safely below 500 words."""
+    """Create a property-developer closing note capped safely below 500 words."""
     ftse_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
     advancers = int((ftse["day_pct"] > 0).sum()) if not ftse.empty else 0
     decliners = int((ftse["day_pct"] < 0).sum()) if not ftse.empty else 0
@@ -409,20 +467,49 @@ def build_pm_summary(
             )
         )
 
-    if not auto_row.empty:
-        auto_move = auto_row.iloc[0]["day_pct"]
-        relative = auto_move - ftse_move if ftse_move is not None else None
-        auto_week = auto_row.iloc[0].get("week_pct")
-        brent = drivers.loc["BZ=F", "day_pct"] if "BZ=F" in drivers.index else None
-        sections.append(
-            (
-                "Autos Focus",
-                f"Auto Trader moved {_format_pct(auto_move)} on the day and "
-                f"{_format_pct(relative)} relative to the FTSE 100; its five-day move is "
-                f"{_format_pct(auto_week)}. Brent moved {_format_pct(brent)}, an important "
-                "read-through for automotive demand, consumer costs and manufacturer margins.",
-            )
+    sonia = property_rates.get("SONIA", {}).get("value")
+    bank_rate = property_rates.get("Bank Rate", {}).get("value")
+    gilt_move = drivers.loc["IGLT.L", "day_pct"] if "IGLT.L" in drivers.index else None
+    bank_move = banks["day_pct"].mean() if not banks.empty else None
+    sections.append(
+        (
+            "Capital & Finance",
+            f"SONIA is {'unavailable' if sonia is None else f'{sonia:.4f}%'} and Bank Rate is "
+            f"{'unavailable' if bank_rate is None else f'{bank_rate:.2f}%'}. The UK gilt proxy "
+            f"moved {_format_pct(gilt_move)}, while the tracked lender basket averaged "
+            f"{_format_pct(bank_move)}. Read these together for refinancing pressure, credit "
+            "availability and buyer mortgage affordability.",
         )
+    )
+
+    materials_move = materials["day_pct"].mean() if not materials.empty else None
+    copper_move = materials.loc["HG=F", "day_pct"] if "HG=F" in materials.index else None
+    sections.append(
+        (
+            "Build-Cost Pipeline",
+            f"The materials and infrastructure basket averaged {_format_pct(materials_move)}; "
+            f"copper moved {_format_pct(copper_move)}. Mining shares are macro proxies, so "
+            "confirm actual tender prices, labour costs and supplier quotes before changing a "
+            "development budget.",
+        )
+    )
+
+    reit_move = real_estate["day_pct"].mean() if not real_estate.empty else None
+    builder_move = housebuilders["day_pct"].mean() if not housebuilders.empty else None
+    discretionary = consumers.loc[consumers.index.intersection(CONSUMER_DISCRETIONARY)]
+    staples = consumers.loc[consumers.index.intersection(CONSUMER_STAPLES)]
+    discretionary_move = discretionary["day_pct"].mean() if not discretionary.empty else None
+    staples_move = staples["day_pct"].mean() if not staples.empty else None
+    sections.append(
+        (
+            "Demand & Competition",
+            f"Listed real-estate bellwethers averaged {_format_pct(reit_move)} and housebuilders "
+            f"averaged {_format_pct(builder_move)}. Consumer discretionary proxies averaged "
+            f"{_format_pct(discretionary_move)} versus {_format_pct(staples_move)} for staples—"
+            "a useful daily sentiment check, not a substitute for mortgage approvals, wages or "
+            "local transaction data.",
+        )
+    )
 
     if news:
         headline_text = "; ".join(
@@ -442,9 +529,10 @@ def build_pm_summary(
         watch_items.append(
             f"sterling after a {_format_pct(drivers.loc['GBPUSD=X', 'day_pct'])} move against the dollar"
         )
-    if "BZ=F" in drivers.index:
+    if not housebuilders.empty:
+        weakest_builder = housebuilders.sort_values("day_pct").iloc[0]
         watch_items.append(
-            f"Brent following its {_format_pct(drivers.loc['BZ=F', 'day_pct'])} move"
+            f"{weakest_builder['company']} after {_format_pct(weakest_builder['day_pct'])}"
         )
     watch_text = "; ".join(watch_items[:4])
     if watch_text:
@@ -469,9 +557,9 @@ def build_pm_summary(
         sections.append(
             (
                 "Prepare for the Next Session",
-                "Check scheduled company statements and UK macro releases before the open, then "
-                "review sterling, oil and overnight moves in global automotive peers. Confirm "
-                "event timing with the company or exchange.",
+                "Check scheduled company statements, Bank of England communications and UK macro "
+                "releases before the open. Review mortgage approvals, CPI, wages, planning data "
+                "and RICS releases when due; confirm dates with the original publisher.",
             )
         )
 
@@ -500,6 +588,7 @@ def _table(
     columns: list[tuple[str, str]],
     limit=None,
     emphasise_first: bool = False,
+    emphasise_extremes: bool = False,
 ) -> str:
     if frame.empty:
         return '<p style="color:#9FB0C5;margin:12px 0 22px;">No usable market data was returned.</p>'
@@ -511,23 +600,26 @@ def _table(
     )
     rows = []
     for row_number, (ticker, row) in enumerate(shown.iterrows()):
+        emphasised = (emphasise_first and row_number == 0) or (
+            emphasise_extremes and row_number in {0, len(shown) - 1}
+        )
         cells = []
         for column, _ in columns:
             cell_colour = "#ECF4FC"
-            weight = "800" if emphasise_first and row_number == 0 else "500"
+            weight = "800" if emphasised else "500"
             if column == "ticker":
                 value = ticker
             elif column in {"day_pct", "week_pct", "month_pct"}:
                 raw_value = row.get(column)
                 value = _format_pct(raw_value)
                 cell_colour = _move_colour(raw_value)
-                weight = "800" if emphasise_first and row_number == 0 else "700"
+                weight = "800" if emphasised else "700"
             elif column == "volume_ratio":
                 ratio = row.get(column)
                 value = "—" if pd.isna(ratio) else f"{ratio:.1f}x"
                 if not pd.isna(ratio) and ratio >= 2:
                     cell_colour = "#F6BD4A"
-                    weight = "800" if emphasise_first and row_number == 0 else "700"
+                    weight = "800" if emphasised else "700"
             elif column == "price":
                 value = f"{row.get(column):.2f}"
             else:
@@ -572,16 +664,32 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
 
     all_tickers = (
         list(ftse_names)
-        + list(UK_AUTOS)
-        + list(GLOBAL_AUTOS)
+        + list(CAPITAL_FINANCE)
+        + list(REAL_ESTATE_BELLWETHERS)
+        + list(HOUSEBUILDERS)
+        + list(MATERIALS_INFRASTRUCTURE)
+        + list(CONSUMER_HEALTH)
         + list(MARKET_DRIVERS)
     )
     snapshot = fetch_snapshot(all_tickers)
     ftse = attach_names(snapshot.loc[snapshot.index.intersection(ftse_names)], ftse_names)
     ftse["sector"] = [sectors.get(ticker, "Unclassified") for ticker in ftse.index]
-    uk_autos = attach_names(snapshot.loc[snapshot.index.intersection(UK_AUTOS)], UK_AUTOS)
-    global_autos = attach_names(
-        snapshot.loc[snapshot.index.intersection(GLOBAL_AUTOS)], GLOBAL_AUTOS
+    banks = attach_names(
+        snapshot.loc[snapshot.index.intersection(CAPITAL_FINANCE)], CAPITAL_FINANCE
+    )
+    real_estate = attach_names(
+        snapshot.loc[snapshot.index.intersection(REAL_ESTATE_BELLWETHERS)],
+        REAL_ESTATE_BELLWETHERS,
+    )
+    housebuilders = attach_names(
+        snapshot.loc[snapshot.index.intersection(HOUSEBUILDERS)], HOUSEBUILDERS
+    )
+    materials = attach_names(
+        snapshot.loc[snapshot.index.intersection(MATERIALS_INFRASTRUCTURE)],
+        MATERIALS_INFRASTRUCTURE,
+    )
+    consumers = attach_names(
+        snapshot.loc[snapshot.index.intersection(CONSUMER_HEALTH)], CONSUMER_HEALTH
     )
     drivers = attach_names(
         snapshot.loc[snapshot.index.intersection(MARKET_DRIVERS)], MARKET_DRIVERS
@@ -601,14 +709,15 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         .to_frame("day_pct")
     )
     property_names = property_exposure(ftse).sort_values("day_pct", ascending=False)
-    news_names = notable["company"].tolist() if not notable.empty else gainers["company"].tolist()
+    news_names = (
+        real_estate["company"].tolist()
+        + housebuilders["company"].tolist()
+        + (notable["company"].tolist() if not notable.empty else gainers["company"].tolist())
+    )
     news = collect_ranked_news(news_names)
     forward_news = collect_forward_watch()
 
-    auto_row = uk_autos.loc[["AUTO.L"]] if "AUTO.L" in uk_autos.index else pd.DataFrame()
     ftse_index_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
-    auto_move = auto_row.iloc[0]["day_pct"] if not auto_row.empty else None
-    relative = auto_move - ftse_index_move if auto_move is not None and ftse_index_move is not None else None
 
     news_html = "".join(
         f"""
@@ -619,7 +728,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
           <td valign="top" style="padding:12px 0;border-bottom:1px solid #294B6B;">
             <div style="color:#F7FAFC;font-size:15px;font-weight:700;line-height:1.35;">{html.escape(story["title"])}</div>
             <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;margin-top:5px;">{html.escape(story.get("source") or "Linked publisher")}</div>
-            <div style="color:#9FB0C5;font-size:12px;line-height:1.45;margin-top:5px;">Potential market or automotive-sector catalyst. Verify the detail and timing at source.</div>
+            <div style="color:#9FB0C5;font-size:12px;line-height:1.45;margin-top:5px;">Potential FTSE, property, financing, materials or demand catalyst. Verify the detail and timing at source.</div>
             <a href="{html.escape(story["link"], quote=True)}" style="display:inline-block;color:#46CFF5;font-size:12px;font-weight:700;text-decoration:none;margin-top:7px;">READ SOURCE →</a>
           </td>
         </tr>"""
@@ -634,12 +743,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         ("volume_ratio", "Volume / 20d"),
     ]
     generated = datetime.now().astimezone().strftime("%A %d %B %Y, %H:%M %Z")
-    auto_summary = (
-        f"Auto Trader moved {_format_pct(auto_move)} and "
-        f"{_format_pct(relative)} relative to the FTSE 100 today."
-        if auto_move is not None
-        else "Auto Trader data was unavailable."
-    )
+    news_heading = "Three stories that matter" if len(news) == 3 else "Stories that matter"
     ftse_move = ftse_index_move
     advancers = int((ftse["day_pct"] > 0).sum())
     decliners = int((ftse["day_pct"] < 0).sum())
@@ -647,29 +751,39 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     leader_move = gainers.iloc[0]["day_pct"] if not gainers.empty else None
     laggard_name = str(fallers.iloc[0]["company"]) if not fallers.empty else "—"
     laggard_move = fallers.iloc[0]["day_pct"] if not fallers.empty else None
-    brent_move = drivers.loc["BZ=F", "day_pct"] if "BZ=F" in drivers.index else None
-    auto_week = auto_row.iloc[0]["week_pct"] if not auto_row.empty else None
-    auto_month = auto_row.iloc[0]["month_pct"] if not auto_row.empty else None
-    auto_volume = auto_row.iloc[0]["volume_ratio"] if not auto_row.empty else None
-    auto_price = auto_row.iloc[0]["price"] if not auto_row.empty else None
     sonia = property_rates.get("SONIA", {}).get("value")
     sonia_as_of = property_rates.get("SONIA", {}).get("as_of", "official latest")
     bank_rate = property_rates.get("Bank Rate", {}).get("value")
     bank_rate_as_of = property_rates.get("Bank Rate", {}).get("as_of", "official latest")
     gilt_move = drivers.loc["IGLT.L", "day_pct"] if "IGLT.L" in drivers.index else None
     sterling_move = drivers.loc["GBPUSD=X", "day_pct"] if "GBPUSD=X" in drivers.index else None
-    property_average = property_names["day_pct"].mean() if not property_names.empty else None
+    bank_average = banks["day_pct"].mean() if not banks.empty else None
+    materials_average = materials["day_pct"].mean() if not materials.empty else None
+    real_estate_average = real_estate["day_pct"].mean() if not real_estate.empty else None
+    housebuilder_average = housebuilders["day_pct"].mean() if not housebuilders.empty else None
+    discretionary = consumers.loc[consumers.index.intersection(CONSUMER_DISCRETIONARY)]
+    staples = consumers.loc[consumers.index.intersection(CONSUMER_STAPLES)]
+    discretionary_average = discretionary["day_pct"].mean() if not discretionary.empty else None
+    staples_average = staples["day_pct"].mean() if not staples.empty else None
     property_read = (
-        f"The listed property, housebuilding and construction basket moved {_format_pct(property_average)} "
-        f"on average. SONIA is {'unavailable' if sonia is None else f'{sonia:.4f}%'} and Bank Rate is "
-        f"{'unavailable' if bank_rate is None else f'{bank_rate:.2f}%'}. The UK gilt proxy moved "
-        f"{_format_pct(gilt_move)} and sterling moved {_format_pct(sterling_move)} against the dollar. "
-        "For Lotus Knor, watch refinancing costs, planning and construction updates, land values and "
-        "buyer affordability together rather than relying on property-share prices alone."
+        f"FTSE real-estate bellwethers averaged {_format_pct(real_estate_average)} and the housebuilder "
+        f"basket averaged {_format_pct(housebuilder_average)}. Lenders averaged {_format_pct(bank_average)} "
+        f"and materials proxies averaged {_format_pct(materials_average)}. For Lotus Knor, read financing, "
+        "build costs and buyer demand together—no single share-price move is a development decision."
     )
     sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
     pm_summary = build_pm_summary(
-        ftse, sector_moves, drivers, auto_row, news, forward_news
+        ftse,
+        sector_moves,
+        drivers,
+        banks,
+        materials,
+        real_estate,
+        housebuilders,
+        consumers,
+        property_rates,
+        news,
+        forward_news,
     )
     pm_summary_html = "".join(
         '<div style="margin:0 0 16px;">'
@@ -710,8 +824,8 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       <td width="92" valign="middle"><img src="{logo_src}" alt="Melquant Labs" width="76" height="76" style="display:block;border-radius:38px;border:1px solid #F6BD4A;"></td>
       <td valign="middle">
-        <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Autos &amp; Property Intelligence</div>
-        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">Daily Autos, Property &amp; FTSE Close</div>
+        <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Property Developer Intelligence</div>
+        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">FTSE 100 Property Developer Close</div>
         <div style="color:#8EA5BD;font-size:12px;margin-top:7px;">{html.escape(generated)} · ANALYZE <span style="color:#F6BD4A;">•</span> MODEL <span style="color:#46CFF5;">•</span> ALPHA</div>
       </td>
     </tr></table>
@@ -720,52 +834,50 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     <div style="color:#8EA5BD;font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;margin:0 5px 5px;">Market pulse</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       {_metric_card('FTSE 100', _format_pct(ftse_move), _move_colour(ftse_move), f'{advancers} up / {decliners} down')}
-      {_metric_card('Auto Trader', _format_pct(auto_move), _move_colour(auto_move), f'{_format_pct(relative)} vs FTSE')}
-      {_metric_card('Brent', _format_pct(brent_move), _move_colour(brent_move), 'autos input signal')}
-      {_metric_card('Notable moves', str(len(notable)), '#F6BD4A', 'price or volume flags')}
+      {_metric_card('Property', _format_pct(real_estate_average), _move_colour(real_estate_average), 'listed bellwethers')}
+      {_metric_card('Housebuilders', _format_pct(housebuilder_average), _move_colour(housebuilder_average), 'buyer-demand proxy')}
+      {_metric_card('Materials', _format_pct(materials_average), _move_colour(materials_average), 'build-cost pipeline')}
     </tr></table>
 
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #F6BD4A;border-radius:10px;margin:14px 5px 0;">
-      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:14px;line-height:1.5;"><strong style="color:#FFFFFF;">Desk read:</strong> {html.escape(auto_summary)} <strong style="color:#34D6A2;">Leader:</strong> {html.escape(leader_name)} {_format_pct(leader_move)}. <strong style="color:#FF6B7A;">Laggard:</strong> {html.escape(laggard_name)} {_format_pct(laggard_move)}.</td></tr>
+      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:14px;line-height:1.5;"><strong style="color:#FFFFFF;">Macro read:</strong> SONIA {'—' if sonia is None else f'{sonia:.4f}%'} · Bank Rate {'—' if bank_rate is None else f'{bank_rate:.2f}%'} · UK gilt proxy {_format_pct(gilt_move)} · GBP/USD {_format_pct(sterling_move)}. <strong style="color:#34D6A2;">FTSE leader:</strong> {html.escape(leader_name)} {_format_pct(leader_move)}. <strong style="color:#FF6B7A;">Laggard:</strong> {html.escape(laggard_name)} {_format_pct(laggard_move)}.</td></tr>
     </table>
-
-    {_section_title('Priority coverage', 'Auto Trader spotlight')}
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0 5px;"><tr>
-      {_metric_card('Price', '—' if auto_price is None else f'{auto_price:.2f}', '#F7FAFC', 'latest close')}
-      {_metric_card('1 day', _format_pct(auto_move), _move_colour(auto_move), 'absolute move')}
-      {_metric_card('5 days', _format_pct(auto_week), _move_colour(auto_week), 'weekly trend')}
-      {_metric_card('1 month', _format_pct(auto_month), _move_colour(auto_month), 'medium trend')}
-    </tr></table>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-      <td width="50%" style="padding:5px;"><div style="background:#112C4A;border:1px solid #2B4F73;border-radius:10px;padding:13px;color:#9FB0C5;font-size:11px;">RELATIVE TO FTSE 100<br><strong style="color:{_move_colour(relative)};font-size:20px;">{_format_pct(relative)}</strong></div></td>
-      <td width="50%" style="padding:5px;"><div style="background:#112C4A;border:1px solid #2B4F73;border-radius:10px;padding:13px;color:#9FB0C5;font-size:11px;">VOLUME VS 20-DAY<br><strong style="color:#46CFF5;font-size:20px;">{'—' if pd.isna(auto_volume) else f'{auto_volume:.1f}x'}</strong></div></td>
-    </tr></table>
 
     {_section_title('FTSE 100 tape', 'Leaders')}
     {_table(gainers, columns, emphasise_first=True)}
     {_section_title('FTSE 100 tape', 'Laggards')}
     {_table(fallers, columns, emphasise_first=True)}
-    {_section_title('Catalyst radar', 'Three stories that matter')}
+    {_section_title('Catalyst radar', news_heading)}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:7px 0 18px;">{news_html}</table>
     {_section_title('Signal monitor', 'Notable FTSE 100 moves')}
     {_table(notable, columns)}
-    {_section_title('UK autos', 'Domestic automotive tape')}
-    {_table(uk_autos.sort_values('day_pct', ascending=False), columns)}
-    {_section_title('Global autos', 'OEM and peer pulse')}
-    {_table(global_autos.sort_values('day_pct', ascending=False), columns)}
-    {_section_title('Cross-market context', 'Sector leadership')}
-    {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')])}
-    {_section_title('Lotus Knor lens', 'Property & Infrastructure')}
+    {_section_title('Pillar 1 · Capital', 'Finance Cost & Credit Ticker')}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0 5px;"><tr>
       {_metric_card('SONIA', '—' if sonia is None else f'{sonia:.4f}%', '#F6BD4A', f'BoE · {sonia_as_of}')}
       {_metric_card('Bank Rate', '—' if bank_rate is None else f'{bank_rate:.2f}%', '#F7FAFC', f'BoE · {bank_rate_as_of}')}
       {_metric_card('UK gilts proxy', _format_pct(gilt_move), _move_colour(gilt_move), 'IGLT daily move')}
       {_metric_card('GBP/USD', _format_pct(sterling_move), _move_colour(sterling_move), 'currency pressure')}
     </tr></table>
+    {_table(banks.sort_values('day_pct', ascending=False), columns, emphasise_extremes=True)}
+    {_section_title('Pillar 2 · Supply chain', 'Material Inflation Pipeline')}
+    {_table(materials.sort_values('day_pct', ascending=False), columns, emphasise_extremes=True)}
+    {_section_title('Pillar 3 · Asset values', 'Real Estate Bellwethers')}
+    {_table(real_estate.sort_values('day_pct', ascending=False), columns, emphasise_extremes=True)}
+    {_section_title('Pillar 3 · Competition', 'Housebuilders & Buyer Demand')}
+    {_table(housebuilders.sort_values('day_pct', ascending=False), columns, emphasise_extremes=True)}
+    {_section_title('Pillar 4 · Affordability', 'Consumer Health & Spending Power')}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0 5px;"><tr>
+      {_metric_card('Discretionary', _format_pct(discretionary_average), _move_colour(discretionary_average), 'Next · M&S · Kingfisher')}
+      {_metric_card('Staples', _format_pct(staples_average), _move_colour(staples_average), 'Tesco · Sainsbury · Unilever')}
+      {_metric_card('FTSE breadth', f'{advancers}/{decliners}', '#F7FAFC', 'advancers / decliners')}
+      {_metric_card('Notable moves', str(len(notable)), '#F6BD4A', 'price or volume flags')}
+    </tr></table>
+    {_table(consumers.sort_values('day_pct', ascending=False), columns, emphasise_extremes=True)}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #46CFF5;border-radius:10px;margin:10px 5px 16px;">
-      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Property investor read-through:</strong> {html.escape(property_read)}</td></tr>
+      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Lotus Knor read-through:</strong> {html.escape(property_read)}</td></tr>
     </table>
-    {_table(property_names, columns, limit=10)}
+    {_section_title('FTSE 100 context', 'Sector Leadership')}
+    {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')], emphasise_extremes=True)}
     {_section_title('Cross-market context', 'Drivers dashboard')}
     {_table(drivers, columns)}
     {_section_title('Portfolio manager close', 'Daily PM Summary')}
@@ -783,8 +895,11 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
 </table></td></tr></table></body></html>"""
     frames = {
         "FTSE 100": ftse,
-        "UK Autos": uk_autos,
-        "Global Autos": global_autos,
+        "Capital & Finance": banks,
+        "Real Estate": real_estate,
+        "Housebuilders": housebuilders,
+        "Materials & Infrastructure": materials,
+        "Consumer Health": consumers,
         "Market Drivers": drivers,
         "Sector Moves": sector_moves,
         "Property & Infrastructure": property_names,
@@ -829,7 +944,7 @@ def main() -> None:
             "cid:melquantlabs-logo",
         )
         send_email(
-            f"Melquant Labs Closing Bell | Autos, Property & FTSE | {subject_date}",
+            f"Melquant Labs Closing Bell | FTSE Property Developer | {subject_date}",
             email_document,
             inline_images={"melquantlabs-logo": LOGO_PATH},
         )
