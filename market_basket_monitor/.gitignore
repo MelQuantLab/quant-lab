@@ -13,3 +13,6 @@ __pycache__/
 *.pyc
 .DS_Store
 .pytest_cache/
+ftse100_constituents.json
+daily_ftse_digest.html
+daily_ftse_dashboard.xlsx

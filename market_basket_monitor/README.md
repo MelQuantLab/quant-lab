@@ -2,6 +2,8 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
+It also includes a weekday FTSE 100 and automotive-sector closing briefing with market leaders and laggards, unusual moves, three notable headlines, an Auto Trader company card, UK and global automotive peers, sector performance and key market drivers.
+
 The project currently uses Auto Trader Group (`AUTO.L`) as a simple starting example. The basket can be expanded to include other equities, indices, exchange-traded funds, or Yahoo Finance instruments.
 
 ## Project purpose
@@ -50,9 +52,10 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 
 ### Automation
 
-Two sample macOS `launchd` configurations are included:
+Three sample macOS `launchd` configurations are included:
 
 - `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
+- `com.melquantlabs.marketmonitor.daily.plist` sends the FTSE 100 and autos briefing at 17:30, Monday to Friday.
 - `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.
@@ -62,13 +65,16 @@ An optional VBA module and AppleScript helper provide manual refresh controls fr
 ```text
 market_basket_monitor/
 ├── market_monitor.py
+├── daily_ftse_digest.py
 ├── config.py
 ├── requirements.txt
 ├── test_market_monitor.py
+├── test_daily_ftse_digest.py
 ├── .env.example
 ├── AutoMonitor.bas
 ├── RunPythonMonitor.applescript
 ├── com.melquantlabs.marketmonitor.alert.plist
+├── com.melquantlabs.marketmonitor.daily.plist
 └── com.melquantlabs.marketmonitor.weekly.plist
 ```
 
@@ -133,6 +139,18 @@ Generate the weekly dashboard update and email digest:
 
 ```bash
 python3 market_monitor.py --mode weekly
+```
+
+Build the daily FTSE 100 and autos briefing without sending it:
+
+```bash
+python3 daily_ftse_digest.py --dry-run
+```
+
+Build and email the briefing:
+
+```bash
+python3 daily_ftse_digest.py
 ```
 
 The Excel dashboard is written to the project directory after a successful run. If it is open and locked by Excel, the monitor reports a warning and retries during the next run.

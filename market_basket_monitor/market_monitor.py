@@ -114,10 +114,17 @@ def fetch_week_history(ticker):
 def fetch_news(query, max_items=3, days_back=None):
     """Pull headlines from Google News RSS for a query. No API key required."""
     import feedparser
+    import requests
     import urllib.parse
 
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=en-GB&gl=GB&ceid=GB:en"
-    feed = feedparser.parse(url)
+    response = requests.get(
+        url,
+        timeout=20,
+        headers={"User-Agent": "MelquantLabsMarketMonitor/1.0"},
+    )
+    response.raise_for_status()
+    feed = feedparser.parse(response.content)
     items = []
     cutoff = None
     if days_back:
@@ -147,11 +154,14 @@ def send_macos_notification(title, message):
 
 
 def send_email(subject, html_body):
-    user = os.environ.get("BT_EMAIL_USER")
-    password = os.environ.get("BT_EMAIL_PASSWORD")
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    security = os.environ.get("SMTP_SECURITY", "starttls").lower()
+    user = os.environ.get("SMTP_USER") or os.environ.get("BT_EMAIL_USER")
+    password = os.environ.get("SMTP_PASSWORD") or os.environ.get("BT_EMAIL_PASSWORD")
     email_from = os.environ.get("EMAIL_FROM", user)
     email_to = os.environ.get("EMAIL_TO", user)
-    if not user or not password or not email_from or not email_to:
+    if not host or not user or not password or not email_from or not email_to:
         print("[error] Email settings are incomplete (check your .env file). "
               "Skipping email send.", file=sys.stderr)
         return
@@ -160,9 +170,20 @@ def send_email(subject, html_body):
     msg["From"] = email_from
     msg["To"] = email_to
 
-    with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT) as server:
+    recipients = [address.strip() for address in email_to.split(",") if address.strip()]
+    if security == "ssl":
+        server = smtplib.SMTP_SSL(host, port)
+    elif security == "starttls":
+        server = smtplib.SMTP(host, port)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+    else:
+        raise ValueError("SMTP_SECURITY must be 'ssl' or 'starttls'")
+
+    with server:
         server.login(user, password)
-        server.sendmail(email_from, [email_to], msg.as_string())
+        server.sendmail(email_from, recipients, msg.as_string())
     print(f"[ok] email sent: {subject}")
 
 
