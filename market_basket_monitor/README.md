@@ -63,7 +63,7 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 Three sample macOS `launchd` configurations are included:
 
 - `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
-- `com.melquantlabs.marketmonitor.daily.plist` refreshes and sends the FTSE 100 property-developer briefing at 16:40, Monday to Friday, using the Mac's local time zone.
+- `com.melquantlabs.marketmonitor.daily.plist` checks once per minute and refreshes and sends the FTSE 100 property-developer briefing once after 16:40, Monday to Friday, using the Mac's local time zone. A private success marker prevents duplicate delivery and allows automatic recovery after sleep or a temporary connection failure.
 - `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.

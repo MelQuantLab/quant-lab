@@ -7,18 +7,12 @@
   <key>ProgramArguments</key>
   <array>
     <string>/path/to/market_basket_monitor/venv/bin/python3</string>
-    <string>/path/to/market_basket_monitor/daily_ftse_digest.py</string>
+    <string>/path/to/market_basket_monitor/run_daily_if_due.py</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/path/to/market_basket_monitor</string>
-  <key>StartCalendarInterval</key>
-  <array>
-    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
-    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
-    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
-    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
-    <dict><key>Weekday</key><integer>6</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
-  </array>
+  <key>StartInterval</key>
+  <integer>60</integer>
   <key>StandardOutPath</key>
   <string>/tmp/melquantlabs_daily_ftse.log</string>
   <key>StandardErrorPath</key>
