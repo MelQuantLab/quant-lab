@@ -14,16 +14,22 @@ Run manually to test:
     python3 market_monitor.py --mode weekly
 """
 import argparse
+import html
 import json
 import os
 import smtplib
+import ssl
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from pathlib import Path
 
 import yfinance as yf
+import certifi
 from dotenv import load_dotenv
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
@@ -113,10 +119,17 @@ def fetch_week_history(ticker):
 def fetch_news(query, max_items=3, days_back=None):
     """Pull headlines from Google News RSS for a query. No API key required."""
     import feedparser
+    import requests
     import urllib.parse
 
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=en-GB&gl=GB&ceid=GB:en"
-    feed = feedparser.parse(url)
+    response = requests.get(
+        url,
+        timeout=20,
+        headers={"User-Agent": "MelquantLabsMarketMonitor/1.0"},
+    )
+    response.raise_for_status()
+    feed = feedparser.parse(response.content)
     items = []
     cutoff = None
     if days_back:
@@ -127,7 +140,17 @@ def fetch_news(query, max_items=3, days_back=None):
             published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
         if cutoff and published and published < cutoff:
             continue
-        items.append({"title": entry.title, "link": entry.link, "published": published})
+        source = ""
+        if getattr(entry, "source", None):
+            source = str(getattr(entry.source, "title", "") or "").strip()
+        items.append(
+            {
+                "title": entry.title,
+                "link": entry.link,
+                "published": published,
+                "source": source,
+            }
+        )
         if len(items) >= max_items:
             break
     return items
@@ -145,23 +168,53 @@ def send_macos_notification(title, message):
         pass  # not on macOS
 
 
-def send_email(subject, html_body):
-    user = os.environ.get("BT_EMAIL_USER")
-    password = os.environ.get("BT_EMAIL_PASSWORD")
+def send_email(subject, html_body, inline_images=None):
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    security = os.environ.get("SMTP_SECURITY", "starttls").lower()
+    user = os.environ.get("SMTP_USER") or os.environ.get("BT_EMAIL_USER")
+    password = os.environ.get("SMTP_PASSWORD") or os.environ.get("BT_EMAIL_PASSWORD")
     email_from = os.environ.get("EMAIL_FROM", user)
+    email_from_name = os.environ.get("EMAIL_FROM_NAME", "MelQuant Labs").strip()
     email_to = os.environ.get("EMAIL_TO", user)
-    if not user or not password or not email_from or not email_to:
+    if not host or not user or not password or not email_from or not email_to:
         print("[error] Email settings are incomplete (check your .env file). "
               "Skipping email send.", file=sys.stderr)
         return
-    msg = MIMEText(html_body, "html")
+    if inline_images:
+        msg = MIMEMultipart("related")
+        alternative = MIMEMultipart("alternative")
+        alternative.attach(MIMEText("This briefing requires an HTML-capable email client.", "plain"))
+        alternative.attach(MIMEText(html_body, "html"))
+        msg.attach(alternative)
+        for content_id, image_path in inline_images.items():
+            with open(image_path, "rb") as image_file:
+                image_part = MIMEImage(image_file.read())
+            image_part.add_header("Content-ID", f"<{content_id}>")
+            image_part.add_header("Content-Disposition", "inline", filename=Path(image_path).name)
+            msg.attach(image_part)
+    else:
+        msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = email_from
-    msg["To"] = email_to
+    msg["From"] = formataddr((email_from_name, email_from))
+    msg["Reply-To"] = email_from
+    msg["To"] = "Undisclosed recipients:;"
 
-    with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT) as server:
+    recipients = [address.strip() for address in email_to.split(",") if address.strip()]
+    tls_context = ssl.create_default_context(cafile=certifi.where())
+    if security == "ssl":
+        server = smtplib.SMTP_SSL(host, port, context=tls_context)
+    elif security == "starttls":
+        server = smtplib.SMTP(host, port)
+        server.ehlo()
+        server.starttls(context=tls_context)
+        server.ehlo()
+    else:
+        raise ValueError("SMTP_SECURITY must be 'ssl' or 'starttls'")
+
+    with server:
         server.login(user, password)
-        server.sendmail(email_from, [email_to], msg.as_string())
+        server.sendmail(email_from, recipients, msg.as_string())
     print(f"[ok] email sent: {subject}")
 
 
@@ -204,13 +257,17 @@ def _clear_data_rows(ws):
         ws.delete_rows(2, ws.max_row - 1)
 
 
-def update_live_sheet(wb, quotes, state, alerted_tickers):
+def update_live_sheet(wb, quotes, state, alerted_tickers, moves_since_last=None):
     ws = _ensure_sheet(wb, "Live", ["Ticker", "Price", "Day %", "Since Last Check %", "Alert", "Updated"])
     _clear_data_rows(ws)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    moves_since_last = moves_since_last or {}
     for ticker, q in quotes.items():
-        last_alert_price = state.get(ticker, {}).get("last_alert_price", q["prev_close"])
-        move_since_last = (q["price"] - last_alert_price) / last_alert_price * 100
+        reference_price = state.get(ticker, {}).get("last_price", q["prev_close"])
+        move_since_last = moves_since_last.get(
+            ticker,
+            (q["price"] - reference_price) / reference_price * 100,
+        )
         ws.append([
             ticker, round(q["price"], 2), round(q["day_pct"], 2), round(move_since_last, 2),
             "ALERT" if ticker in alerted_tickers else "", now,
@@ -257,27 +314,52 @@ def save_workbook(wb):
 
 # ---------- modes ----------
 
+def evaluate_quotes(quotes, state, threshold_pct):
+    """Update monitoring state and return newly triggered alerts and price moves."""
+    alerts = []
+    moves_since_last = {}
+
+    for ticker, quote in quotes.items():
+        ticker_state = state.setdefault(ticker, {})
+        reference_price = ticker_state.get("last_price", quote["prev_close"])
+        move_since_last = (
+            (quote["price"] - reference_price) / reference_price * 100
+        )
+        moves_since_last[ticker] = move_since_last
+
+        threshold_reached = (
+            abs(quote["day_pct"]) >= threshold_pct
+            or abs(move_since_last) >= threshold_pct
+        )
+        if threshold_reached and not ticker_state.get("alert_active", False):
+            alerts.append((ticker, quote, move_since_last))
+
+        ticker_state["alert_active"] = threshold_reached
+        ticker_state["last_price"] = quote["price"]
+
+    return alerts, moves_since_last
+
 def run_check():
     state = load_state()
     quotes = fetch_quotes(config.TICKERS)
-    alerts = []
-
-    for ticker, q in quotes.items():
-        last_alert_price = state.get(ticker, {}).get("last_alert_price", q["prev_close"])
-        move_since_last = (q["price"] - last_alert_price) / last_alert_price * 100
-
-        triggered = abs(q["day_pct"]) >= config.ALERT_THRESHOLD_PCT or abs(move_since_last) >= config.ALERT_THRESHOLD_PCT
-        if triggered:
-            alerts.append((ticker, q, move_since_last))
-            state.setdefault(ticker, {})["last_alert_price"] = q["price"]
-        state.setdefault(ticker, {})["last_price"] = q["price"]
+    alerts, moves_since_last = evaluate_quotes(
+        quotes,
+        state,
+        config.ALERT_THRESHOLD_PCT,
+    )
 
     save_state(state)
 
     # Always refresh the Excel dashboard's Live sheet, alerts or not.
     wb = _open_workbook()
     alerted_tickers = {t for t, _, _ in alerts}
-    update_live_sheet(wb, quotes, state, alerted_tickers)
+    update_live_sheet(
+        wb,
+        quotes,
+        state,
+        alerted_tickers,
+        moves_since_last,
+    )
 
     if not alerts:
         save_workbook(wb)
@@ -308,8 +390,11 @@ def run_check():
         "; ".join(f"{t}: {q['day_pct']:+.2f}%" for t, q, _ in alerts),
     )
 
-    html = "<h3>Basket alert</h3><pre>" + summary.replace("<", "&lt;") + "</pre>"
-    send_email(f"[Market Alert] {len(alerts)} move(s) in {config.BASKET_NAME}", html)
+    html_body = "<h3>Basket alert</h3><pre>" + html.escape(summary) + "</pre>"
+    send_email(
+        f"[Market Alert] {len(alerts)} move(s) in {config.BASKET_NAME}",
+        html_body,
+    )
 
 
 def run_weekly():
@@ -339,11 +424,14 @@ def run_weekly():
 
     html_parts.append("<h3>Recent news</h3>")
     for ticker, _, _, _, news in rows:
-        html_parts.append(f"<p><b>{ticker}</b></p><ul>")
+        html_parts.append(f"<p><b>{html.escape(ticker)}</b></p><ul>")
         if not news:
             html_parts.append("<li>No notable headlines this week.</li>")
         for n in news:
-            html_parts.append(f"<li><a href='{n['link']}'>{n['title']}</a></li>")
+            html_parts.append(
+                f'<li><a href="{html.escape(n["link"], quote=True)}">'
+                f'{html.escape(n["title"])}</a></li>'
+            )
         html_parts.append("</ul>")
 
     html = "\n".join(html_parts)

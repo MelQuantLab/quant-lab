@@ -26,9 +26,7 @@ NEWS_ITEMS_PER_TICKER = 3
 WEEKLY_NEWS_LOOKBACK_DAYS = 7
 
 # --- Email delivery ---
-# Credentials and addresses are read from environment variables (see .env.example).
-SMTP_HOST = "mail.btinternet.com"
-SMTP_PORT = 465  # SSL
+# Server, credentials and addresses are read from environment variables.
 
 # --- Excel dashboard ---
 # A workbook written to this path every run, so you can just open it in Excel.

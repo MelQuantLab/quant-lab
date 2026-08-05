@@ -2,7 +2,17 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
-The project currently uses Auto Trader Group (`AUTO.L`) as a simple starting example. The basket can be expanded to include other equities, indices, exchange-traded funds, or Yahoo Finance instruments.
+It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The briefing starts with a clean FTSE overview and a separate property-developer pulse, then maps the market directly to a developer's decisions: capital and finance, materials and infrastructure, real-estate bellwethers, housebuilder competition, consumer spending power and the next-session watchlist. An Alpha View turns the latest news, market tape and upcoming catalysts into clearly labelled one-day, one-week, 14-day and one-month research hypotheses. The 14-day lens concentrates on earnings, company statements and scheduled macro events. A sub-500-word closing note leads with the immediate actions and then adds concise autos, financials, technology and macro summaries.
+
+The configurable intraday alert monitor still uses Auto Trader Group (`AUTO.L`) as its simple example basket. It is independent of the property-focused daily closing briefing and can be expanded to other instruments.
+
+## Daily briefing preview
+
+The monitor produces a branded, property-focused FTSE 100 closing briefing every weekday. The public example below is a demonstration snapshot: it contains no credentials, email addresses or private delivery settings.
+
+![MelQuant Labs Daily Market Briefing](docs/images/daily-briefing-preview.png)
+
+[Open the full HTML example](docs/daily-briefing-preview.html)
 
 ## Project purpose
 
@@ -50,9 +60,10 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 
 ### Automation
 
-Two sample macOS `launchd` configurations are included:
+Three sample macOS `launchd` configurations are included:
 
 - `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
+- `com.melquantlabs.marketmonitor.daily.plist` refreshes and sends the FTSE 100 property-developer briefing at 16:40, Monday to Friday, using the Mac's local time zone.
 - `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.
@@ -62,12 +73,16 @@ An optional VBA module and AppleScript helper provide manual refresh controls fr
 ```text
 market_basket_monitor/
 ├── market_monitor.py
+├── daily_ftse_digest.py
 ├── config.py
 ├── requirements.txt
+├── test_market_monitor.py
+├── test_daily_ftse_digest.py
 ├── .env.example
 ├── AutoMonitor.bas
 ├── RunPythonMonitor.applescript
 ├── com.melquantlabs.marketmonitor.alert.plist
+├── com.melquantlabs.marketmonitor.daily.plist
 └── com.melquantlabs.marketmonitor.weekly.plist
 ```
 
@@ -91,10 +106,11 @@ Open `.env` and enter the email account details used for delivery:
 BT_EMAIL_USER=your-email@example.com
 BT_EMAIL_PASSWORD=your-app-password
 EMAIL_FROM=your-email@example.com
-EMAIL_TO=your-email@example.com
+EMAIL_FROM_NAME=MelQuant Labs
+EMAIL_TO=first-recipient@example.com,second-recipient@example.com
 ```
 
-Keep `.env` private. It is already excluded by `.gitignore` and should never be committed.
+Separate multiple recipients with commas. Recipients are delivered through the private SMTP envelope and are not exposed in the visible `To` header. `EMAIL_FROM_NAME` controls the professional sender name shown by the recipient's mail application. Keep `.env` private: it is already excluded by `.gitignore` and should never be committed.
 
 ## Configuration
 
@@ -134,6 +150,18 @@ Generate the weekly dashboard update and email digest:
 python3 market_monitor.py --mode weekly
 ```
 
+Build the daily FTSE 100 property-developer briefing without sending it:
+
+```bash
+python3 daily_ftse_digest.py --dry-run
+```
+
+Build and email the briefing:
+
+```bash
+python3 daily_ftse_digest.py
+```
+
 The Excel dashboard is written to the project directory after a successful run. If it is open and locked by Excel, the monitor reports a warning and retries during the next run.
 
 ## Scheduling on macOS
@@ -151,9 +179,13 @@ Copy and load the schedules:
 ```bash
 cp com.melquantlabs.marketmonitor.alert.plist ~/Library/LaunchAgents/
 cp com.melquantlabs.marketmonitor.weekly.plist ~/Library/LaunchAgents/
+cp com.melquantlabs.marketmonitor.daily.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.alert.plist
 launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.weekly.plist
+launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.daily.plist
 ```
+
+The daily job uses the Mac's current time zone. Keep the Mac awake and connected to the internet around 16:40. If it is asleep at the scheduled time, macOS normally starts the missed calendar job after the Mac wakes.
 
 Unload them when required:
 
@@ -181,14 +213,18 @@ macOS may request permission for Excel to run the AppleScript helper.
 ## Data sources and limitations
 
 - Price data is provided by Yahoo Finance through `yfinance` and may be delayed, incomplete, or revised.
-- News is collected from Google News RSS and may include duplicate or loosely related results.
+- News is discovered through Google News RSS, attributed to its publisher and ranked to favour sources such as Reuters, Bloomberg, the Financial Times, Yahoo Finance and established UK outlets. Availability varies and paywalled article text is not bypassed.
+- Official SONIA and Bank Rate observations come from the Bank of England statistical database and display their observation dates.
+- Broad FTSE 100 sector weights are sourced from the latest public sector breakdown for the iShares Core FTSE 100 UCITS ETF (ISF) and are labelled as an index-tracker proxy with their observation date.
+- The Daily PM Summary combines the calculated FTSE tape with financing, property, housebuilder, materials and consumer proxies plus attributed headlines. Forward-looking headlines are included only when explicitly relevant to the UK market or property-development environment; otherwise the report supplies a general watchlist and asks the reader to verify dates at the original source.
+- Planning approvals, mortgage approvals, CPI, wages and RICS surveys update less frequently than markets. They are treated as dated release-watch items rather than fabricated daily readings.
 - The monitor runs locally and therefore depends on the Mac being powered on with network access.
 - It is a research and monitoring tool, not an execution system or source of investment advice.
 - The current version uses a straightforward percentage threshold rather than a statistically calibrated risk model.
 
 ## Planned development
 
-- Add automated tests for state handling, alert thresholds, and workbook generation.
+- Expand automated tests to cover data-provider failures and email delivery.
 - Separate data, reporting, delivery, and orchestration into dedicated modules.
 - Introduce market-session awareness and more precise scheduling.
 - Add richer cross-asset indicators and configurable signal rules.
