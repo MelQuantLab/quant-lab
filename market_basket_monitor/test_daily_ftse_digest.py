@@ -95,14 +95,19 @@ class DailyFtseDigestTests(unittest.TestCase):
             }
         ]
 
-        paragraphs = digest.build_pm_summary(
+        sections = digest.build_pm_summary(
             ftse, sectors, drivers, auto, news, forward_news=[]
         )
-        summary = " ".join(paragraphs)
+        titles = [title for title, _ in sections]
+        summary = " ".join(body for _, body in sections)
 
         self.assertIn("Winner plc", summary)
         self.assertIn("Auto Trader", summary)
         self.assertIn("Reuters", summary)
+        self.assertIn("Today's Market", titles)
+        self.assertIn("What to Pay Attention To", titles)
+        self.assertIn("Things We're Watching", titles)
+        self.assertIn("Prepare for the Next Session", titles)
         self.assertLessEqual(len(summary.split()), 500)
 
     @patch("daily_ftse_digest.fetch_news")

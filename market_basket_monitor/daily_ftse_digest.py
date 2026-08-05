@@ -313,7 +313,7 @@ def build_pm_summary(
     auto_row: pd.DataFrame,
     news: list[dict],
     forward_news: list[dict],
-) -> list[str]:
+) -> list[tuple[str, str]]:
     """Create a concise, data-led closing note capped safely below 500 words."""
     ftse_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
     advancers = int((ftse["day_pct"] > 0).sum()) if not ftse.empty else 0
@@ -326,8 +326,9 @@ def build_pm_summary(
     laggard_move = fallers.iloc[0]["day_pct"] if not fallers.empty else None
     market_tone = "advanced" if ftse_move is not None and ftse_move > 0 else "declined" if ftse_move is not None and ftse_move < 0 else "finished broadly unchanged"
 
-    paragraphs = [
+    sections = [
         (
+            "Today's Market",
             f"The FTSE 100 {market_tone} {_format_pct(ftse_move)}, with {advancers} advancers "
             f"against {decliners} decliners. {leader} led the index at {_format_pct(leader_move)}, "
             f"while {laggard} was the weakest name at {_format_pct(laggard_move)}."
@@ -337,10 +338,13 @@ def build_pm_summary(
     if not sector_moves.empty:
         strongest_sector = str(sector_moves.index[0])
         weakest_sector = str(sector_moves.index[-1])
-        paragraphs.append(
-            f"At sector level, {strongest_sector} showed the strongest average performance, "
-            f"while {weakest_sector} lagged. This breadth is worth comparing with the individual "
-            "stock moves above before treating an outsized move as company-specific."
+        sections.append(
+            (
+                "Sector Read",
+                f"{strongest_sector} showed the strongest average performance, while "
+                f"{weakest_sector} lagged. Compare this breadth with the individual stock moves "
+                "above before treating an outsized move as company-specific.",
+            )
         )
 
     if not auto_row.empty:
@@ -348,11 +352,14 @@ def build_pm_summary(
         relative = auto_move - ftse_move if ftse_move is not None else None
         auto_week = auto_row.iloc[0].get("week_pct")
         brent = drivers.loc["BZ=F", "day_pct"] if "BZ=F" in drivers.index else None
-        paragraphs.append(
-            f"For priority coverage, Auto Trader moved {_format_pct(auto_move)} on the day and "
-            f"{_format_pct(relative)} relative to the FTSE 100; its five-day move is "
-            f"{_format_pct(auto_week)}. Brent moved {_format_pct(brent)}, an important read-through "
-            "for automotive demand, consumer costs and manufacturer margins."
+        sections.append(
+            (
+                "Autos Focus",
+                f"Auto Trader moved {_format_pct(auto_move)} on the day and "
+                f"{_format_pct(relative)} relative to the FTSE 100; its five-day move is "
+                f"{_format_pct(auto_week)}. Brent moved {_format_pct(brent)}, an important "
+                "read-through for automotive demand, consumer costs and manufacturer margins.",
+            )
         )
 
     if news:
@@ -360,28 +367,56 @@ def build_pm_summary(
             f"{story['title']} ({story.get('source') or 'source linked above'})"
             for story in news[:3]
         )
-        paragraphs.append(f"The principal reported catalysts were: {headline_text}.")
+        sections.append(
+            ("What to Pay Attention To", f"The principal reported catalysts were: {headline_text}.")
+        )
+
+    watch_items = []
+    if not sector_moves.empty:
+        watch_items.append(f"weakness in {sector_moves.index[-1]}")
+    if not fallers.empty:
+        watch_items.append(f"whether {laggard} stabilises after {_format_pct(laggard_move)}")
+    if "GBPUSD=X" in drivers.index:
+        watch_items.append(
+            f"sterling after a {_format_pct(drivers.loc['GBPUSD=X', 'day_pct'])} move against the dollar"
+        )
+    if "BZ=F" in drivers.index:
+        watch_items.append(
+            f"Brent following its {_format_pct(drivers.loc['BZ=F', 'day_pct'])} move"
+        )
+    watch_text = "; ".join(watch_items[:4])
+    if watch_text:
+        watch_text = watch_text[0].upper() + watch_text[1:] + "."
+    else:
+        watch_text = "No material cross-market warning signal was identified in today's data."
+    sections.append(("Things We're Watching", watch_text))
 
     if forward_news:
         watch_text = "; ".join(
             f"{story['title']} ({story.get('source') or 'source linked below'})"
             for story in forward_news[:3]
         )
-        paragraphs.append(
-            f"Looking ahead, monitor: {watch_text}. Treat these as a watchlist rather than a "
-            "confirmed event calendar, and verify timing at the linked source."
+        sections.append(
+            (
+                "Prepare for the Next Session",
+                f"Monitor: {watch_text}. Treat these as a watchlist rather than a confirmed "
+                "event calendar, and verify timing at the linked source.",
+            )
         )
     else:
-        paragraphs.append(
-            "Looking ahead, monitor scheduled company statements, UK macro releases, sterling, "
-            "oil and any overnight moves in global automotive peers. Confirm event timing with the "
-            "company or exchange before the next session."
+        sections.append(
+            (
+                "Prepare for the Next Session",
+                "Check scheduled company statements and UK macro releases before the open, then "
+                "review sterling, oil and overnight moves in global automotive peers. Confirm "
+                "event timing with the company or exchange.",
+            )
         )
 
-    words = " ".join(paragraphs).split()
+    words = " ".join(body for _, body in sections).split()
     if len(words) > 480:
-        return [" ".join(words[:480]).rstrip(".,;:") + "."]
-    return paragraphs
+        return [("Daily Briefing", " ".join(words[:480]).rstrip(".,;:") + ".")]
+    return sections
 
 
 def _format_pct(value) -> str:
@@ -555,8 +590,13 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         ftse, sector_moves, drivers, auto_row, news, forward_news
     )
     pm_summary_html = "".join(
-        f'<p style="margin:0 0 12px;color:#DCE8F4;font-size:14px;line-height:1.65;">{html.escape(paragraph)}</p>'
-        for paragraph in pm_summary
+        '<div style="margin:0 0 16px;">'
+        '<div style="margin:0 0 5px;color:#F6BD4A;font-size:10px;font-weight:800;'
+        'letter-spacing:1px;text-transform:uppercase;">'
+        f'{html.escape(title)}</div>'
+        '<div style="color:#DCE8F4;font-size:14px;line-height:1.65;">'
+        f'{html.escape(body)}</div></div>'
+        for title, body in pm_summary
     )
     forward_links_html = "".join(
         f'<li style="margin:0 0 7px;"><a href="{html.escape(story["link"], quote=True)}" '
