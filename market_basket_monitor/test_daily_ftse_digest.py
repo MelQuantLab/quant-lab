@@ -41,6 +41,26 @@ class DailyFtseDigestTests(unittest.TestCase):
         self.assertIn("+1.25%", card)
         self.assertIn("market close", card)
 
+    def test_table_can_bold_the_top_mover(self):
+        frame = pd.DataFrame(
+            {
+                "company": ["Winner plc", "Runner-up plc"],
+                "day_pct": [5.2, 3.1],
+            },
+            index=["WIN.L", "RUN.L"],
+        )
+
+        table = digest._table(
+            frame,
+            [("company", "Company"), ("day_pct", "1 day")],
+            emphasise_first=True,
+        )
+
+        winner_cell = table.split("Winner plc", 1)[0].rsplit("<td", 1)[-1]
+        runner_up_cell = table.split("Runner-up plc", 1)[0].rsplit("<td", 1)[-1]
+        self.assertIn("font-weight:800", winner_cell)
+        self.assertIn("font-weight:500", runner_up_cell)
+
 
 if __name__ == "__main__":
     unittest.main()

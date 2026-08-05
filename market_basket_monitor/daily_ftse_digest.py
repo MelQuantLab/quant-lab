@@ -230,7 +230,12 @@ def _move_colour(value) -> str:
     return "#F7FAFC"
 
 
-def _table(frame: pd.DataFrame, columns: list[tuple[str, str]], limit=None) -> str:
+def _table(
+    frame: pd.DataFrame,
+    columns: list[tuple[str, str]],
+    limit=None,
+    emphasise_first: bool = False,
+) -> str:
     if frame.empty:
         return '<p style="color:#9FB0C5;margin:12px 0 22px;">No usable market data was returned.</p>'
     shown = frame.head(limit) if limit else frame
@@ -244,20 +249,20 @@ def _table(frame: pd.DataFrame, columns: list[tuple[str, str]], limit=None) -> s
         cells = []
         for column, _ in columns:
             cell_colour = "#ECF4FC"
-            weight = "500"
+            weight = "800" if emphasise_first and row_number == 0 else "500"
             if column == "ticker":
                 value = ticker
             elif column in {"day_pct", "week_pct", "month_pct"}:
                 raw_value = row.get(column)
                 value = _format_pct(raw_value)
                 cell_colour = _move_colour(raw_value)
-                weight = "700"
+                weight = "800" if emphasise_first and row_number == 0 else "700"
             elif column == "volume_ratio":
                 ratio = row.get(column)
                 value = "—" if pd.isna(ratio) else f"{ratio:.1f}x"
                 if not pd.isna(ratio) and ratio >= 2:
                     cell_colour = "#F6BD4A"
-                    weight = "700"
+                    weight = "800" if emphasise_first and row_number == 0 else "700"
             elif column == "price":
                 value = f"{row.get(column):.2f}"
             else:
@@ -432,9 +437,9 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     </tr></table>
 
     {_section_title('FTSE 100 tape', 'Leaders')}
-    {_table(gainers, columns)}
+    {_table(gainers, columns, emphasise_first=True)}
     {_section_title('FTSE 100 tape', 'Laggards')}
-    {_table(fallers, columns)}
+    {_table(fallers, columns, emphasise_first=True)}
     {_section_title('Catalyst radar', 'Three stories that matter')}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:7px 0 18px;">{news_html}</table>
     {_section_title('Signal monitor', 'Notable FTSE 100 moves')}
