@@ -752,6 +752,15 @@ def _move_colour(value) -> str:
     return "#F7FAFC"
 
 
+def _compact_text(value: str, limit: int = 165) -> str:
+    """Keep executive-strip copy concise without cutting through a word."""
+    cleaned = " ".join(value.split())
+    if len(cleaned) <= limit:
+        return cleaned
+    shortened = cleaned[: limit - 1].rsplit(" ", 1)[0].rstrip(".,;:")
+    return shortened + "…"
+
+
 def _table(
     frame: pd.DataFrame,
     columns: list[tuple[str, str]],
@@ -1090,6 +1099,21 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         news,
         forward_news,
     )
+    pm_sections = dict(pm_summary)
+    executive_items = (
+        ("What matters", _compact_text(pm_sections.get("What to Pay Attention To", "Review the principal FTSE and property catalysts."))),
+        ("Principal risk", _compact_text(pm_sections.get("Things We're Watching", "Monitor breadth, financing conditions and the weakest constituent."))),
+        ("Next session", _compact_text(pm_sections.get("Prepare for the Next Session", "Check the next company and UK macro calendar before the open."))),
+    )
+    executive_strip_html = "".join(
+        '<td class="executive-cell" width="33.33%" valign="top" '
+        'style="background:#102A47;padding:16px 17px;border-right:1px solid #2B4F73;">'
+        '<div style="color:#46CFF5;font-size:9px;font-weight:800;letter-spacing:1.2px;'
+        f'text-transform:uppercase;margin-bottom:6px;">{html.escape(label)}</div>'
+        '<div style="color:#DCE8F4;font-size:12px;line-height:1.45;">'
+        f'{html.escape(copy)}</div></td>'
+        for label, copy in executive_items
+    )
     pm_summary_html = "".join(
         ('<div style="margin:18px 0 10px;padding-top:14px;border-top:1px solid #31567E;'
          'color:#46CFF5;font-size:10px;font-weight:800;letter-spacing:1.4px;'
@@ -1119,6 +1143,11 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
   .shell {{ width:100% !important; border-radius:0 !important; }}
   .content-pad {{ padding:18px 12px 8px !important; }}
   .header-pad {{ padding:20px 16px !important; }}
+  .brand-logo-cell {{ width:82px !important; padding-right:14px !important; }}
+  .brand-logo {{ width:74px !important; height:74px !important; border-radius:39px !important; }}
+  .header-eyebrow {{ font-size:9px !important; letter-spacing:1.2px !important; }}
+  .header-subtitle {{ font-size:12px !important; }}
+  .executive-cell {{ display:block !important; width:100% !important; box-sizing:border-box !important; border-right:0 !important; border-bottom:1px solid #2B4F73 !important; }}
   .footer-pad {{ padding:18px 16px !important; }}
   .metric-cell {{ display:block !important; width:100% !important; box-sizing:border-box !important; }}
   .data-table {{ table-layout:fixed !important; }}
@@ -1130,14 +1159,18 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#050D17;"><tr><td align="center" style="padding:22px 10px;">
 <table class="shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:760px;background:#091827;border:1px solid #1D3C5C;border-radius:20px;overflow:hidden;">
   <tr><td class="header-pad" style="background:#07121F;padding:24px 30px;border-bottom:1px solid #254A6B;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-      <td width="116" valign="middle"><img src="{logo_src}" alt="Melquant Labs" width="100" height="100" style="display:block;border-radius:50px;border:2px solid #F6BD4A;"></td>
-      <td valign="middle">
-        <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Property Developer Intelligence</div>
-        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">FTSE 100 Property Developer Close</div>
-        <div style="color:#8EA5BD;font-size:12px;margin-top:7px;">{html.escape(generated)} · ANALYZE <span style="color:#F6BD4A;">•</span> MODEL <span style="color:#46CFF5;">•</span> ALPHA</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="table-layout:fixed;"><tr>
+      <td class="brand-logo-cell" width="138" valign="middle" style="width:138px;padding-right:24px;"><img class="brand-logo" src="{logo_src}" alt="MelQuant Labs" width="106" height="106" style="display:block;width:106px;height:106px;border-radius:55px;border:2px solid #F6BD4A;"></td>
+      <td valign="middle" style="min-width:0;overflow-wrap:break-word;">
+        <div class="header-eyebrow" style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">MelQuant Labs · Closing Bell</div>
+        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:6px;">Daily Market Briefing</div>
+        <div class="header-subtitle" style="color:#9FB0C5;font-size:14px;margin-top:7px;">FTSE 100 &amp; Property Intelligence</div>
+        <div style="color:#71869C;font-size:11px;margin-top:9px;">Data as of {html.escape(generated)}</div>
       </td>
     </tr></table>
+  </td></tr>
+  <tr><td style="padding:0;background:#2B4F73;border-bottom:1px solid #2B4F73;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>{executive_strip_html}</tr></table>
   </td></tr>
   <tr><td class="content-pad" style="padding:22px 25px 10px;">
     <div style="color:#8EA5BD;font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;margin:0 5px 5px;">FTSE 100 Overview</div>

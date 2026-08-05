@@ -7,6 +7,12 @@ import daily_ftse_digest as digest
 
 
 class DailyFtseDigestTests(unittest.TestCase):
+    def test_compact_text_preserves_short_copy_and_truncates_long_copy(self):
+        self.assertEqual(digest._compact_text("Short market note."), "Short market note.")
+        compact = digest._compact_text("word " * 100, limit=40)
+        self.assertLessEqual(len(compact), 40)
+        self.assertTrue(compact.endswith("…"))
+
     def test_lse_ticker_conversion(self):
         self.assertEqual(digest.yahoo_lse_ticker("AUTO"), "AUTO.L")
         self.assertEqual(digest.yahoo_lse_ticker("BT.A"), "BT-A.L")

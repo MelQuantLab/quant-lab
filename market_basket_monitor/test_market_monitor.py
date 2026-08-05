@@ -82,6 +82,36 @@ class EmailPrivacyTests(unittest.TestCase):
         self.assertEqual(message["To"], "Undisclosed recipients:;")
         self.assertIsNone(message["Bcc"])
 
+    @patch("market_monitor.smtplib.SMTP")
+    def test_inline_logo_is_attached_with_matching_content_id(self, smtp):
+        settings = {
+            "SMTP_HOST": "smtp.example.com",
+            "SMTP_PORT": "587",
+            "SMTP_SECURITY": "starttls",
+            "SMTP_USER": "sender@example.com",
+            "SMTP_PASSWORD": "private-password",
+            "EMAIL_FROM": "sender@example.com",
+            "EMAIL_TO": "recipient@example.com",
+        }
+        logo = market_monitor.BASE_DIR / "assets" / "melquantlab-logo.jpg"
+        with patch.dict(os.environ, settings, clear=False):
+            market_monitor.send_email(
+                "Daily briefing",
+                '<img src="cid:melquantlabs-logo" alt="MelQuant Labs">',
+                inline_images={"melquantlabs-logo": logo},
+            )
+
+        raw_message = smtp.return_value.sendmail.call_args.args[2]
+        message = message_from_string(raw_message)
+        parts = list(message.walk())
+        html_parts = [part for part in parts if part.get_content_type() == "text/html"]
+        logo_parts = [part for part in parts if part.get("Content-ID") == "<melquantlabs-logo>"]
+
+        self.assertEqual(len(html_parts), 1)
+        self.assertIn("cid:melquantlabs-logo", html_parts[0].get_payload(decode=True).decode())
+        self.assertEqual(len(logo_parts), 1)
+        self.assertEqual(logo_parts[0].get_content_maintype(), "image")
+
 
 if __name__ == "__main__":
     unittest.main()
