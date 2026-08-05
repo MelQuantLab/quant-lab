@@ -18,6 +18,7 @@ import html
 import json
 import os
 import smtplib
+import ssl
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 import yfinance as yf
+import certifi
 from dotenv import load_dotenv
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
@@ -196,12 +198,13 @@ def send_email(subject, html_body, inline_images=None):
     msg["To"] = email_to
 
     recipients = [address.strip() for address in email_to.split(",") if address.strip()]
+    tls_context = ssl.create_default_context(cafile=certifi.where())
     if security == "ssl":
-        server = smtplib.SMTP_SSL(host, port)
+        server = smtplib.SMTP_SSL(host, port, context=tls_context)
     elif security == "starttls":
         server = smtplib.SMTP(host, port)
         server.ehlo()
-        server.starttls()
+        server.starttls(context=tls_context)
         server.ehlo()
     else:
         raise ValueError("SMTP_SECURITY must be 'ssl' or 'starttls'")
