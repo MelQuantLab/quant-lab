@@ -6,6 +6,14 @@ It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The bri
 
 The configurable intraday alert monitor still uses Auto Trader Group (`AUTO.L`) as its simple example basket. It is independent of the property-focused daily closing briefing and can be expanded to other instruments.
 
+## Daily briefing preview
+
+The monitor produces a branded, property-focused FTSE 100 closing briefing every weekday. The public example below is a demonstration snapshot: it contains no credentials, email addresses or private delivery settings.
+
+![MelQuant Labs Daily Market Briefing](docs/images/daily-briefing-preview.png)
+
+[Open the full HTML example](docs/daily-briefing-preview.html)
+
 ## Project purpose
 
 Market data is most useful when it is delivered consistently and placed in context. This monitor brings together price checks, movement alerts, recent news, and weekly history in one lightweight workflow.
