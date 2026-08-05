@@ -213,7 +213,9 @@ macOS may request permission for Excel to run the AppleScript helper.
 ## Data sources and limitations
 
 - Price data is provided by Yahoo Finance through `yfinance` and may be delayed, incomplete, or revised.
-- News is discovered through Google News RSS, attributed to its publisher and ranked to favour sources such as Reuters, Bloomberg, the Financial Times, Yahoo Finance and established UK outlets. Availability varies and paywalled article text is not bypassed.
+- News is discovered through Google News RSS, attributed to its publisher and ranked to favour sources such as Reuters, Bloomberg, the Financial Times, Yahoo Finance and established UK outlets. The monitor receives headline metadata and links only: it does not read or summarise the full Bloomberg, Financial Times or Reuters article body, and paywalls are not bypassed.
+- The 14-day Alpha View only names a catalyst when a specific attributed forward-looking headline is returned. If none is found, it says so rather than substituting a generic calendar instruction or fabricated investment idea.
+- Before any email is sent, the monitor requires at least 90 FTSE constituents carrying the current London market date. Stale or materially incomplete price data causes the delivery to fail and retry rather than presenting old figures as today's close.
 - Official SONIA and Bank Rate observations come from the Bank of England statistical database and display their observation dates.
 - Broad FTSE 100 sector weights are sourced from the latest public sector breakdown for the iShares Core FTSE 100 UCITS ETF (ISF) and are labelled as an index-tracker proxy with their observation date.
 - The Daily PM Summary combines the calculated FTSE tape with financing, property, housebuilder, materials and consumer proxies plus attributed headlines. Forward-looking headlines are included only when explicitly relevant to the UK market or property-development environment; otherwise the report supplies a general watchlist and asks the reader to verify dates at the original source.

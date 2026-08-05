@@ -461,7 +461,7 @@ def collect_ranked_news(company_names: list[str], limit: int = 3) -> list[dict]:
     stories = []
     seen = set()
     for query in queries:
-        for raw_story in fetch_news(query, max_items=5, days_back=5):
+        for raw_story in fetch_news(query, max_items=5, days_back=2):
             story = _normalise_story(raw_story)
             key = story["title"].lower().strip()
             if key in seen:
@@ -866,12 +866,7 @@ def build_alpha_view(
     strongest = max(sector_averages, key=sector_averages.get) if sector_averages else "FTSE leaders"
     weakest = min(sector_averages, key=sector_averages.get) if sector_averages else "FTSE laggards"
     next_catalyst = forward_news[0]["title"] if forward_news else "the next UK macro and company calendar"
-    fortnight_catalysts = "; ".join(
-        story["title"] for story in forward_news[:3]
-    ) or (
-        "scheduled FTSE company statements, earnings updates, Bank of England communications "
-        "and UK inflation, wages and mortgage data"
-    )
+    fortnight_catalysts = "; ".join(story["title"] for story in forward_news[:3])
 
     property_tape = pd.concat([real_estate, housebuilders]).drop_duplicates()
     property_tape = property_tape.sort_values("month_pct", ascending=False) if not property_tape.empty else property_tape
@@ -896,9 +891,13 @@ def build_alpha_view(
         },
         {
             "horizon": "14 Days",
-            "title": "Earnings and catalyst window",
-            "thesis": f"Build the two-week event map around: {fortnight_catalysts}. Watch earnings guidance, margins, order books and management tone for evidence that expectations are being revised.",
-            "risk": "Calendar items may move, consensus may already reflect the expected outcome, and an apparently strong result can still disappoint on guidance or valuation.",
+            "title": "Verified catalyst window" if fortnight_catalysts else "No verified 14-day catalyst",
+            "thesis": (
+                f"Monitor these attributed forward-looking reports: {fortnight_catalysts}. Confirm each date at the linked publisher before acting."
+                if fortnight_catalysts
+                else "The free feeds returned no specific, attributable two-week event. No investment hypothesis is asserted for this horizon."
+            ),
+            "risk": "Headline feeds are not an official earnings calendar; event dates can change and must be checked against company RNS or an official release calendar.",
         },
         {
             "horizon": "1 Month",
@@ -1040,6 +1039,8 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         ("volume_ratio", "Volume / 20d"),
     ]
     generated = datetime.now().astimezone().strftime("%A %d %B %Y, %H:%M %Z")
+    market_dates = ftse["as_of"].dropna().astype(str) if "as_of" in ftse else pd.Series(dtype=str)
+    market_as_of = market_dates.mode().iloc[0] if not market_dates.empty else "unavailable"
     news_heading = "Three stories that matter" if len(news) == 3 else "Stories that matter"
     ftse_move = ftse_index_move
     advancers = int((ftse["day_pct"] > 0).sum())
@@ -1244,7 +1245,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
   <tr><td class="footer-pad" style="background:#07121F;padding:22px 30px;border-top:1px solid #254A6B;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       <td valign="middle" style="color:#F6BD4A;font-size:12px;font-weight:800;letter-spacing:1px;">MELQUANT LABS</td>
-      <td align="right" style="color:#71869C;font-size:10px;line-height:1.5;">Public-data research aid only.<br>Verify prices and headlines at source. Not investment advice.</td>
+      <td align="right" style="color:#71869C;font-size:10px;line-height:1.5;">Prices: Yahoo Finance adjusted daily data · market date {html.escape(market_as_of)}<br>Rates: Bank of England · weights: iShares ISF ({html.escape(sector_weights_as_of)})<br>News: Google News RSS headlines only—not article bodies. Verify every claim at source.</td>
     </tr></table>
   </td></tr>
 </table></td></tr></table></body></html>"""
@@ -1284,6 +1285,29 @@ def write_workbook(frames: dict[str, pd.DataFrame], news: list[dict]) -> None:
     workbook.save(WORKBOOK_OUTPUT)
 
 
+def validate_delivery(frames: dict[str, pd.DataFrame], now: datetime | None = None) -> str:
+    """Refuse to email a report whose core FTSE tape is incomplete or stale."""
+    current = (now or datetime.now().astimezone()).astimezone()
+    ftse = frames.get("FTSE 100", pd.DataFrame())
+    if len(ftse) < 90:
+        raise ValueError(f"FTSE coverage is incomplete: received {len(ftse)} constituents")
+    dates = pd.to_datetime(ftse.get("as_of"), errors="coerce").dropna()
+    if dates.empty:
+        raise ValueError("FTSE market date is unavailable")
+    market_date = dates.max().date()
+    if market_date != current.date():
+        raise ValueError(
+            f"FTSE data is stale: latest market date {market_date.isoformat()}, "
+            f"expected {current.date().isoformat()}"
+        )
+    coverage = int((dates.dt.date == market_date).sum())
+    if coverage < 90:
+        raise ValueError(
+            f"FTSE same-day coverage is incomplete: {coverage} constituents for {market_date}"
+        )
+    return market_date.isoformat()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Build files without emailing")
@@ -1295,6 +1319,8 @@ def main() -> None:
     print(f"[ok] HTML briefing written: {HTML_OUTPUT}")
     print(f"[ok] Excel dashboard written: {WORKBOOK_OUTPUT}")
     if not args.dry_run:
+        market_date = validate_delivery(frames)
+        print(f"[ok] delivery validation passed: FTSE market date {market_date}")
         subject_date = datetime.now().strftime("%d/%m/%Y")
         email_document = document.replace(
             f"data:image/jpeg;base64,{base64.b64encode(LOGO_PATH.read_bytes()).decode('ascii')}",

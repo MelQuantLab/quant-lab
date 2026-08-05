@@ -283,6 +283,38 @@ class DailyFtseDigestTests(unittest.TestCase):
         self.assertEqual(ideas[0]["title"], "Catalyst follow-through: SEGRO")
         self.assertIn("+1.20%", ideas[0]["thesis"])
 
+    def test_alpha_view_does_not_invent_fortnight_catalyst(self):
+        frame = pd.DataFrame(
+            {"company": ["Example plc"], "day_pct": [1.0], "month_pct": [2.0]},
+            index=["EX.L"],
+        )
+        ideas = digest.build_alpha_view(frame, {"Industrials": frame}, frame, pd.DataFrame(), {}, [], [])
+
+        self.assertEqual(ideas[2]["title"], "No verified 14-day catalyst")
+        self.assertIn("No investment hypothesis is asserted", ideas[2]["thesis"])
+
+    def test_delivery_validation_rejects_stale_market_tape(self):
+        frame = pd.DataFrame(
+            {"as_of": ["2026-08-04"] * 100, "day_pct": [0.0] * 100},
+            index=[f"T{i}.L" for i in range(100)],
+        )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            digest.validate_delivery(
+                {"FTSE 100": frame},
+                now=digest.datetime(2026, 8, 5, 16, 40).astimezone(),
+            )
+
+    def test_delivery_validation_accepts_complete_same_day_tape(self):
+        frame = pd.DataFrame(
+            {"as_of": ["2026-08-05"] * 100, "day_pct": [0.0] * 100},
+            index=[f"T{i}.L" for i in range(100)],
+        )
+        result = digest.validate_delivery(
+            {"FTSE 100": frame},
+            now=digest.datetime(2026, 8, 5, 16, 40).astimezone(),
+        )
+        self.assertEqual(result, "2026-08-05")
+
     @patch("daily_ftse_digest.fetch_news")
     def test_forward_watch_rejects_backward_looking_headlines(self, fetch_news):
         fetch_news.return_value = [
