@@ -1262,13 +1262,13 @@ def main() -> None:
     print(f"[ok] HTML briefing written: {HTML_OUTPUT}")
     print(f"[ok] Excel dashboard written: {WORKBOOK_OUTPUT}")
     if not args.dry_run:
-        subject_date = datetime.now().strftime("%d %b %Y")
+        subject_date = datetime.now().strftime("%d/%m/%Y")
         email_document = document.replace(
             f"data:image/jpeg;base64,{base64.b64encode(LOGO_PATH.read_bytes()).decode('ascii')}",
             "cid:melquantlabs-logo",
         )
         send_email(
-            f"Melquant Labs Closing Bell | FTSE Property Developer | {subject_date}",
+            f"MelQuant Labs Daily Market Briefing | {subject_date}",
             email_document,
             inline_images={"melquantlabs-logo": LOGO_PATH},
         )
