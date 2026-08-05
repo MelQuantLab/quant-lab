@@ -857,6 +857,12 @@ def build_alpha_view(
     strongest = max(sector_averages, key=sector_averages.get) if sector_averages else "FTSE leaders"
     weakest = min(sector_averages, key=sector_averages.get) if sector_averages else "FTSE laggards"
     next_catalyst = forward_news[0]["title"] if forward_news else "the next UK macro and company calendar"
+    fortnight_catalysts = "; ".join(
+        story["title"] for story in forward_news[:3]
+    ) or (
+        "scheduled FTSE company statements, earnings updates, Bank of England communications "
+        "and UK inflation, wages and mortgage data"
+    )
 
     property_tape = pd.concat([real_estate, housebuilders]).drop_duplicates()
     property_tape = property_tape.sort_values("month_pct", ascending=False) if not property_tape.empty else property_tape
@@ -880,6 +886,12 @@ def build_alpha_view(
             "risk": "One session does not establish a trend; macro data, earnings and index concentration can quickly reverse the relationship.",
         },
         {
+            "horizon": "14 Days",
+            "title": "Earnings and catalyst window",
+            "thesis": f"Build the two-week event map around: {fortnight_catalysts}. Watch earnings guidance, margins, order books and management tone for evidence that expectations are being revised.",
+            "risk": "Calendar items may move, consensus may already reflect the expected outcome, and an apparently strong result can still disappoint on guidance or valuation.",
+        },
+        {
             "horizon": "1 Month",
             "title": f"Rates and property repricing: {property_name}",
             "thesis": f"{property_name} has returned {property_month} over one month while SONIA stands at {sonia_text}. Track whether easing finance conditions support property and housebuilder relative performance.",
@@ -889,7 +901,12 @@ def build_alpha_view(
 
 
 def _alpha_view_html(ideas: list[dict[str, str]]) -> str:
-    colours = {"1 Day": "#F6BD4A", "1 Week": "#46CFF5", "1 Month": "#A78BFA"}
+    colours = {
+        "1 Day": "#F6BD4A",
+        "1 Week": "#46CFF5",
+        "14 Days": "#34D6A2",
+        "1 Month": "#A78BFA",
+    }
     cards = []
     for idea in ideas:
         colour = colours.get(idea["horizon"], "#F6BD4A")

@@ -227,7 +227,7 @@ class DailyFtseDigestTests(unittest.TestCase):
         )
         self.assertLessEqual(len(summary.split()), 500)
 
-    def test_alpha_view_has_three_distinct_time_horizons(self):
+    def test_alpha_view_has_four_distinct_time_horizons(self):
         ftse = pd.DataFrame(
             {"company": ["Leader plc"], "day_pct": [2.5], "month_pct": [5.0]},
             index=["LEAD.L"],
@@ -247,9 +247,13 @@ class DailyFtseDigestTests(unittest.TestCase):
             [{"title": "UK inflation data due"}],
         )
 
-        self.assertEqual([idea["horizon"] for idea in ideas], ["1 Day", "1 Week", "1 Month"])
+        self.assertEqual(
+            [idea["horizon"] for idea in ideas],
+            ["1 Day", "1 Week", "14 Days", "1 Month"],
+        )
         self.assertIn("Company announces results", ideas[0]["thesis"])
-        self.assertIn("SONIA", ideas[2]["thesis"])
+        self.assertIn("UK inflation data due", ideas[2]["thesis"])
+        self.assertIn("SONIA", ideas[3]["thesis"])
 
     def test_alpha_view_matches_headline_to_named_company(self):
         ftse = pd.DataFrame(
