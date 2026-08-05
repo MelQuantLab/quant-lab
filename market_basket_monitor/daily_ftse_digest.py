@@ -7,6 +7,7 @@ import argparse
 import base64
 import html
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
@@ -28,12 +29,23 @@ WORKBOOK_OUTPUT = BASE_DIR / "daily_ftse_dashboard.xlsx"
 LOGO_PATH = BASE_DIR / "assets" / "melquantlab-logo.jpg"
 FTSE_SOURCE = "https://en.wikipedia.org/wiki/FTSE_100_Index"
 BOE_DATA_URL = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp"
+ISHARES_HOLDINGS_URL = (
+    "https://www.ishares.com/uk/individual/en/products/251795/"
+    "ishares-core-ftse-100-ucits-etf?siteEntryPassthrough=true&switchLocale=y"
+)
 
 CAPITAL_FINANCE = {
     "HSBA.L": "HSBC",
     "BARC.L": "Barclays",
     "LLOY.L": "Lloyds Banking Group",
     "NWG.L": "NatWest Group",
+}
+
+AUTOS_SECTOR_SUMMARY = {
+    "AUTO.L": "Auto Trader",
+    "INCH.L": "Inchcape",
+    "AML.L": "Aston Martin Lagonda",
+    "MOTR.L": "Motorpoint",
 }
 
 REAL_ESTATE_BELLWETHERS = {
@@ -74,6 +86,34 @@ CONSUMER_HEALTH = {
 
 CONSUMER_DISCRETIONARY = {"NXT.L", "MKS.L", "KGF.L"}
 CONSUMER_STAPLES = {"TSCO.L", "SBRY.L", "ULVR.L"}
+
+SECTOR_ORDER = (
+    "Financials",
+    "Consumer Staples",
+    "Industrials",
+    "Energy",
+    "Health Care",
+    "Basic Materials",
+    "Consumer Discretionary",
+    "Utilities",
+    "Technology & Media",
+    "Real Estate",
+)
+
+# Current broad-sector overrides for names whose detailed ICB labels are ambiguous.
+BROAD_SECTOR_OVERRIDES = {
+    "III.L": "Financials",
+    "MNG.L": "Financials",
+    "SMT.L": "Financials",
+    "PCT.L": "Financials",
+    "FCIT.L": "Financials",
+    "BRBY.L": "Consumer Discretionary",
+    "MKS.L": "Consumer Staples",
+    "REL.L": "Industrials",
+    "MTLN.L": "Industrials",
+    "HLMA.L": "Technology & Media",
+    "SGE.L": "Technology & Media",
+}
 
 MARKET_DRIVERS = {
     "^FTSE": "FTSE 100",
@@ -134,6 +174,77 @@ def fetch_boe_property_rates() -> dict[str, dict[str, object]]:
                 "as_of": str(latest["DATE"]),
             }
     return rates
+
+
+def _display_sector(sector: str) -> str:
+    """Combine ETF classifications into the dashboard's investment-house sectors."""
+    if sector in {"Communication", "Information Technology"}:
+        return "Technology & Media"
+    if sector == "Materials":
+        return "Basic Materials"
+    return sector
+
+
+def _fallback_sector(sector: str) -> str:
+    """Map detailed ICB-style labels when the holdings classification is unavailable."""
+    value = str(sector).lower()
+    if "real estate" in value:
+        return "Real Estate"
+    if any(term in value for term in ("bank", "insurance", "finance", "investment")):
+        return "Financials"
+    if any(term in value for term in ("food", "beverage", "tobacco", "personal goods")):
+        return "Consumer Staples"
+    if any(term in value for term in ("oil", "gas", "coal", "energy")):
+        return "Energy"
+    if any(term in value for term in ("pharma", "health", "medical")):
+        return "Health Care"
+    if any(term in value for term in ("mining", "chemical", "industrial material")):
+        return "Basic Materials"
+    if any(term in value for term in ("electricity", "utilities", "water")):
+        return "Utilities"
+    if any(term in value for term in ("software", "computer", "technology", "media", "telecom")):
+        return "Technology & Media"
+    if any(term in value for term in ("retail", "travel", "leisure", "automobile", "home construction")):
+        return "Consumer Discretionary"
+    return "Industrials"
+
+
+def fetch_ftse_sector_metadata() -> tuple[dict[str, float], dict[str, str], str]:
+    """Load FTSE 100 proxy sector weights from the iShares ISF public page."""
+    response = requests.get(
+        ISHARES_HOLDINGS_URL,
+        timeout=25,
+        headers={"User-Agent": "MelquantLabsMarketMonitor/1.0"},
+    )
+    response.raise_for_status()
+    decoded = html.unescape(response.text)
+    fund_match = re.search(
+        r'"fund":\{.*?"value":(\[[^\]]+\]).*?"fullName":"exposureBreakdowns\.fund"',
+        decoded,
+        re.DOTALL,
+    )
+    type_match = re.search(
+        r'"type":\{.*?"value":(\[[^\]]+\]).*?"fullName":"exposureBreakdowns\.type"',
+        decoded,
+        re.DOTALL,
+    )
+    date_match = re.search(
+        r'"formattedValue":"([0-9]{2}/[A-Za-z]{3}/[0-9]{4})".*?'
+        r'"fullName":"exposureBreakdowns\.asOf"',
+        decoded,
+        re.DOTALL,
+    )
+    if not fund_match or not type_match:
+        raise ValueError("iShares sector breakdown was not found")
+    values = json.loads(fund_match.group(1))
+    sectors = json.loads(type_match.group(1))
+    weights = {}
+    for sector, value in zip(sectors, values):
+        if sector == "Cash and/or Derivatives":
+            continue
+        display_sector = _display_sector(sector)
+        weights[display_sector] = weights.get(display_sector, 0.0) + float(value)
+    return weights, {}, date_match.group(1) if date_match else "latest available"
 
 
 def property_exposure(frame: pd.DataFrame) -> pd.DataFrame:
@@ -421,11 +532,32 @@ def collect_forward_watch(limit: int = 3) -> list[dict]:
     return sorted(stories, key=_story_rank, reverse=True)[:limit]
 
 
+def collect_sector_news(sectors: tuple[str, ...] = SECTOR_ORDER) -> dict[str, dict]:
+    """Return at most one reputable, recent headline for each broad FTSE sector."""
+    result = {}
+    for sector in sectors:
+        query = f"FTSE 100 {sector} UK companies news"
+        candidates = []
+        for raw_story in fetch_news(query, max_items=5, days_back=3):
+            story = _normalise_story(raw_story)
+            title = story["title"].lower()
+            if (
+                _story_rank(story)[0] >= 70
+                and not any(term in title for term in LOW_VALUE_HEADLINE_TERMS)
+            ):
+                candidates.append(story)
+        if candidates:
+            result[sector] = sorted(candidates, key=_story_rank, reverse=True)[0]
+    return result
+
+
 def build_pm_summary(
     ftse: pd.DataFrame,
     sector_moves: pd.DataFrame,
     drivers: pd.DataFrame,
     banks: pd.DataFrame,
+    autos: pd.DataFrame,
+    technology: pd.DataFrame,
     materials: pd.DataFrame,
     real_estate: pd.DataFrame,
     housebuilders: pd.DataFrame,
@@ -455,6 +587,55 @@ def build_pm_summary(
         )
     ]
 
+    autos_move = autos["day_pct"].mean() if not autos.empty else None
+    if not autos.empty:
+        autos_leader = autos.sort_values("day_pct", ascending=False).iloc[0]
+        autos_detail = (
+            f" The strongest tracked name was {autos_leader['company']} at "
+            f"{_format_pct(autos_leader['day_pct'])}."
+        )
+    else:
+        autos_detail = ""
+    sections.append(
+        (
+            "Autos",
+            f"The tracked UK autos and marketplace basket averaged {_format_pct(autos_move)}."
+            f"{autos_detail}",
+        )
+    )
+
+    bank_move = banks["day_pct"].mean() if not banks.empty else None
+    sections.append(
+        (
+            "Financials",
+            f"The tracked UK lender basket averaged {_format_pct(bank_move)}. Its direction is a "
+            "daily signal for credit sentiment, but lending standards and mortgage pricing remain "
+            "the more direct property indicators.",
+        )
+    )
+
+    technology_move = technology["day_pct"].mean() if not technology.empty else None
+    sections.append(
+        (
+            "Technology",
+            f"FTSE technology-related constituents averaged {_format_pct(technology_move)}. The "
+            "sector is a smaller part of the UK index, so treat it mainly as a risk-appetite and "
+            "business-investment signal.",
+        )
+    )
+
+    gilt_move = drivers.loc["IGLT.L", "day_pct"] if "IGLT.L" in drivers.index else None
+    sterling_move = drivers.loc["GBPUSD=X", "day_pct"] if "GBPUSD=X" in drivers.index else None
+    brent_move = drivers.loc["BZ=F", "day_pct"] if "BZ=F" in drivers.index else None
+    sections.append(
+        (
+            "Macro View",
+            f"The FTSE 100 moved {_format_pct(ftse_move)}, the UK gilt proxy {_format_pct(gilt_move)}, "
+            f"sterling {_format_pct(sterling_move)} against the dollar and Brent {_format_pct(brent_move)}. "
+            "Together they frame risk appetite, financing conditions and imported-cost pressure.",
+        )
+    )
+
     if not sector_moves.empty:
         strongest_sector = str(sector_moves.index[0])
         weakest_sector = str(sector_moves.index[-1])
@@ -469,8 +650,6 @@ def build_pm_summary(
 
     sonia = property_rates.get("SONIA", {}).get("value")
     bank_rate = property_rates.get("Bank Rate", {}).get("value")
-    gilt_move = drivers.loc["IGLT.L", "day_pct"] if "IGLT.L" in drivers.index else None
-    bank_move = banks["day_pct"].mean() if not banks.empty else None
     sections.append(
         (
             "Capital & Finance",
@@ -657,6 +836,59 @@ def _section_title(kicker: str, title: str) -> str:
     </table>"""
 
 
+def _sector_cards(
+    sectors: dict[str, pd.DataFrame],
+    weights: dict[str, float],
+    stories: dict[str, dict],
+    weights_as_of: str,
+) -> str:
+    cards = []
+    for sector in SECTOR_ORDER:
+        frame = sectors.get(sector, pd.DataFrame()).sort_values("day_pct", ascending=False)
+        average = frame["day_pct"].mean() if not frame.empty else None
+        weight = weights.get(sector)
+        if not frame.empty:
+            leader = frame.iloc[0]
+            laggard = frame.iloc[-1]
+            tape_html = (
+                '<strong style="color:#34D6A2;">Leader:</strong> '
+                f'<strong>{html.escape(str(leader["company"]))} {_format_pct(leader["day_pct"])}</strong>. '
+                '<strong style="color:#FF6B7A;">Laggard:</strong> '
+                f'<strong>{html.escape(str(laggard["company"]))} {_format_pct(laggard["day_pct"])}</strong>.'
+            )
+        else:
+            tape_html = "No usable constituent price data was returned."
+        story = stories.get(sector)
+        if story:
+            news_line = (
+                f'<a href="{html.escape(story["link"], quote=True)}" '
+                'style="color:#46CFF5;text-decoration:none;font-weight:700;">'
+                f'{html.escape(story["title"])}</a>'
+                f'<span style="color:#71869C;"> — {html.escape(story.get("source") or "publisher")}</span>'
+            )
+        else:
+            news_line = (
+                '<span style="color:#8EA5BD;">No qualifying sector-specific headline was returned; '
+                'price action is the primary daily signal.</span>'
+            )
+        cards.append(
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" '
+            'style="background:#102A47;border:1px solid #31567E;border-radius:12px;margin:10px 0;">'
+            '<tr><td style="padding:16px 18px;">'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>'
+            f'<td style="color:#F7FAFC;font-size:17px;font-weight:800;">{html.escape(sector)}</td>'
+            f'<td align="right" style="color:#F6BD4A;font-size:13px;font-weight:800;">'
+            f'{"—" if weight is None else f"{weight:.1f}% weight"}</td></tr></table>'
+            f'<div style="color:{_move_colour(average)};font-size:14px;font-weight:800;margin-top:8px;">'
+            f'Daily constituent average {_format_pct(average)}</div>'
+            f'<div style="color:#DCE8F4;font-size:13px;line-height:1.55;margin-top:6px;">{tape_html}</div>'
+            f'<div style="font-size:12px;line-height:1.5;margin-top:8px;">{news_line}</div>'
+            f'<div style="color:#607990;font-size:9px;margin-top:8px;">Weight proxy: iShares ISF holdings, {html.escape(weights_as_of)}</div>'
+            '</td></tr></table>'
+        )
+    return "".join(cards)
+
+
 def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     constituents = load_ftse100_constituents()
     ftse_names = {item["ticker"]: item["company"] for item in constituents}
@@ -665,6 +897,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     all_tickers = (
         list(ftse_names)
         + list(CAPITAL_FINANCE)
+        + list(AUTOS_SECTOR_SUMMARY)
         + list(REAL_ESTATE_BELLWETHERS)
         + list(HOUSEBUILDERS)
         + list(MATERIALS_INFRASTRUCTURE)
@@ -676,6 +909,10 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     ftse["sector"] = [sectors.get(ticker, "Unclassified") for ticker in ftse.index]
     banks = attach_names(
         snapshot.loc[snapshot.index.intersection(CAPITAL_FINANCE)], CAPITAL_FINANCE
+    )
+    autos = attach_names(
+        snapshot.loc[snapshot.index.intersection(AUTOS_SECTOR_SUMMARY)],
+        AUTOS_SECTOR_SUMMARY,
     )
     real_estate = attach_names(
         snapshot.loc[snapshot.index.intersection(REAL_ESTATE_BELLWETHERS)],
@@ -694,10 +931,28 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     drivers = attach_names(
         snapshot.loc[snapshot.index.intersection(MARKET_DRIVERS)], MARKET_DRIVERS
     )
+    technology = ftse[
+        ftse["sector"].str.contains("technology|software|computer|electronic", case=False, na=False)
+    ].copy()
     try:
         property_rates = fetch_boe_property_rates()
     except Exception:
         property_rates = {}
+    try:
+        sector_weights, ticker_sectors, sector_weights_as_of = fetch_ftse_sector_metadata()
+    except Exception:
+        sector_weights, ticker_sectors, sector_weights_as_of = {}, {}, "unavailable"
+    ftse["broad_sector"] = [
+        ticker_sectors.get(
+            ticker,
+            BROAD_SECTOR_OVERRIDES.get(ticker, _fallback_sector(sectors.get(ticker, ""))),
+        )
+        for ticker in ftse.index
+    ]
+    broad_sector_frames = {
+        sector: ftse[ftse["broad_sector"].eq(sector)].copy()
+        for sector in SECTOR_ORDER
+    }
 
     gainers = ftse.sort_values("day_pct", ascending=False).head(5)
     fallers = ftse.sort_values("day_pct").head(5)
@@ -716,6 +971,14 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     )
     news = collect_ranked_news(news_names)
     forward_news = collect_forward_watch()
+    sector_news = collect_sector_news()
+    for story in news:
+        title = story["title"].lower()
+        for sector, frame in broad_sector_frames.items():
+            if sector in sector_news or frame.empty:
+                continue
+            if any(str(company).lower() in title for company in frame["company"]):
+                sector_news[sector] = story
 
     ftse_index_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
 
@@ -772,11 +1035,20 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         "build costs and buyer demand together—no single share-price move is a development decision."
     )
     sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
+    sector_cards_html = _sector_cards(
+        broad_sector_frames, sector_weights, sector_news, sector_weights_as_of
+    )
+    weight_strip = " · ".join(
+        f"{sector} {weight:.1f}%"
+        for sector, weight in sorted(sector_weights.items(), key=lambda item: item[1], reverse=True)
+    ) or "Sector weights unavailable"
     pm_summary = build_pm_summary(
         ftse,
         sector_moves,
         drivers,
         banks,
+        autos,
+        technology,
         materials,
         real_estate,
         housebuilders,
@@ -786,6 +1058,10 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         forward_news,
     )
     pm_summary_html = "".join(
+        ('<div style="margin:18px 0 10px;padding-top:14px;border-top:1px solid #31567E;'
+         'color:#46CFF5;font-size:10px;font-weight:800;letter-spacing:1.4px;'
+         'text-transform:uppercase;">Sector Summary</div>' if title == "Autos" else "")
+        +
         '<div style="margin:0 0 16px;">'
         '<div style="margin:0 0 5px;color:#F6BD4A;font-size:10px;font-weight:800;'
         'letter-spacing:1px;text-transform:uppercase;">'
@@ -822,7 +1098,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
 <table class="shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:760px;background:#091827;border:1px solid #1D3C5C;border-radius:20px;overflow:hidden;">
   <tr><td class="header-pad" style="background:#07121F;padding:24px 30px;border-bottom:1px solid #254A6B;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-      <td width="92" valign="middle"><img src="{logo_src}" alt="Melquant Labs" width="76" height="76" style="display:block;border-radius:38px;border:1px solid #F6BD4A;"></td>
+      <td width="116" valign="middle"><img src="{logo_src}" alt="Melquant Labs" width="100" height="100" style="display:block;border-radius:50px;border:2px solid #F6BD4A;"></td>
       <td valign="middle">
         <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Property Developer Intelligence</div>
         <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">FTSE 100 Property Developer Close</div>
@@ -831,17 +1107,29 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     </tr></table>
   </td></tr>
   <tr><td class="content-pad" style="padding:22px 25px 10px;">
-    <div style="color:#8EA5BD;font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;margin:0 5px 5px;">Market pulse</div>
+    <div style="color:#8EA5BD;font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;margin:0 5px 5px;">FTSE 100 Overview</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       {_metric_card('FTSE 100', _format_pct(ftse_move), _move_colour(ftse_move), f'{advancers} up / {decliners} down')}
+      {_metric_card('Market breadth', f'{advancers}/{decliners}', '#F7FAFC', 'advancers / decliners')}
+      {_metric_card('Leader', _format_pct(leader_move), '#34D6A2', leader_name)}
+      {_metric_card('Laggard', _format_pct(laggard_move), '#FF6B7A', laggard_name)}
+    </tr></table>
+
+    <div style="color:#46CFF5;font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;margin:16px 5px 5px;">Property Developer Pulse</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       {_metric_card('Property', _format_pct(real_estate_average), _move_colour(real_estate_average), 'listed bellwethers')}
       {_metric_card('Housebuilders', _format_pct(housebuilder_average), _move_colour(housebuilder_average), 'buyer-demand proxy')}
       {_metric_card('Materials', _format_pct(materials_average), _move_colour(materials_average), 'build-cost pipeline')}
+      {_metric_card('SONIA', '—' if sonia is None else f'{sonia:.4f}%', '#F6BD4A', f'BoE · {sonia_as_of}')}
     </tr></table>
 
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #F6BD4A;border-radius:10px;margin:14px 5px 0;">
       <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:14px;line-height:1.5;"><strong style="color:#FFFFFF;">Macro read:</strong> SONIA {'—' if sonia is None else f'{sonia:.4f}%'} · Bank Rate {'—' if bank_rate is None else f'{bank_rate:.2f}%'} · UK gilt proxy {_format_pct(gilt_move)} · GBP/USD {_format_pct(sterling_move)}. <strong style="color:#34D6A2;">FTSE leader:</strong> {html.escape(leader_name)} {_format_pct(leader_move)}. <strong style="color:#FF6B7A;">Laggard:</strong> {html.escape(laggard_name)} {_format_pct(laggard_move)}.</td></tr>
     </table>
+    <div style="background:#0D243E;border:1px solid #274766;border-radius:9px;margin:10px 5px 18px;padding:10px 13px;color:#9FB0C5;font-size:10px;line-height:1.55;">
+      <strong style="color:#F6BD4A;">FTSE 100 SECTOR WEIGHTS</strong> · {html.escape(weight_strip)}<br>
+      <span style="color:#607990;">Proxy: iShares ISF holdings · {html.escape(sector_weights_as_of)}</span>
+    </div>
 
     {_section_title('FTSE 100 tape', 'Leaders')}
     {_table(gainers, columns, emphasise_first=True)}
@@ -876,8 +1164,8 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #46CFF5;border-radius:10px;margin:10px 5px 16px;">
       <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Lotus Noor Developments Focus Lens:</strong> {html.escape(property_read)}</td></tr>
     </table>
-    {_section_title('FTSE 100 context', 'Sector Leadership')}
-    {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')], emphasise_extremes=True)}
+    {_section_title('Investment house view', 'FTSE 100 Sector Intelligence')}
+    {sector_cards_html}
     {_section_title('Cross-market context', 'Drivers dashboard')}
     {_table(drivers, columns)}
     {_section_title('Portfolio manager close', 'Daily PM Summary')}
@@ -896,6 +1184,8 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     frames = {
         "FTSE 100": ftse,
         "Capital & Finance": banks,
+        "Autos Summary": autos,
+        "Technology Summary": technology,
         "Real Estate": real_estate,
         "Housebuilders": housebuilders,
         "Materials & Infrastructure": materials,

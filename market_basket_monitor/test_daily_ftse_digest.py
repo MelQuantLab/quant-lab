@@ -65,6 +65,25 @@ class DailyFtseDigestTests(unittest.TestCase):
         self.assertEqual(result["SONIA"]["as_of"], "03 Aug 2026")
         self.assertEqual(result["Bank Rate"]["value"], 3.75)
 
+    @patch("daily_ftse_digest.requests.get")
+    def test_ftse_sector_metadata_combines_technology_and_communication(self, get):
+        get.return_value.text = (
+            '"asOf":{"formattedValue":"03/Aug/2026",'
+            '"fullName":"exposureBreakdowns.asOf"},'
+            '"fund":{"value":[0.31,0.82,10.38],'
+            '"fullName":"exposureBreakdowns.fund"},'
+            '"type":{"value":["Information Technology","Communication","Financials"],'
+            '"fullName":"exposureBreakdowns.type"}'
+        )
+        get.return_value.raise_for_status.return_value = None
+
+        weights, ticker_sectors, as_of = digest.fetch_ftse_sector_metadata()
+
+        self.assertAlmostEqual(weights["Technology & Media"], 1.13)
+        self.assertEqual(ticker_sectors, {})
+        self.assertEqual(weights["Financials"], 10.38)
+        self.assertEqual(as_of, "03/Aug/2026")
+
     def test_move_colours_distinguish_direction(self):
         self.assertEqual(digest._move_colour(1.0), "#34D6A2")
         self.assertEqual(digest._move_colour(-1.0), "#FF6B7A")
@@ -137,6 +156,12 @@ class DailyFtseDigestTests(unittest.TestCase):
         banks = pd.DataFrame(
             {"company": ["Lloyds"], "day_pct": [1.0]}, index=["LLOY.L"]
         )
+        autos = pd.DataFrame(
+            {"company": ["Auto Trader"], "day_pct": [0.6]}, index=["AUTO.L"]
+        )
+        technology = pd.DataFrame(
+            {"company": ["Tech plc"], "day_pct": [1.2]}, index=["TECH.L"]
+        )
         materials = pd.DataFrame(
             {"company": ["Copper"], "day_pct": [2.0]}, index=["HG=F"]
         )
@@ -167,6 +192,8 @@ class DailyFtseDigestTests(unittest.TestCase):
             sectors,
             drivers,
             banks,
+            autos,
+            technology,
             materials,
             real_estate,
             housebuilders,
@@ -183,6 +210,10 @@ class DailyFtseDigestTests(unittest.TestCase):
         self.assertIn("housebuilders", summary)
         self.assertIn("Reuters", summary)
         self.assertIn("Today's Market", titles)
+        self.assertIn("Autos", titles)
+        self.assertIn("Financials", titles)
+        self.assertIn("Technology", titles)
+        self.assertIn("Macro View", titles)
         self.assertIn("What to Pay Attention To", titles)
         self.assertIn("Things We're Watching", titles)
         self.assertIn("Prepare for the Next Session", titles)
