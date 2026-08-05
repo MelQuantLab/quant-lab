@@ -9,7 +9,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 STATE_PATH = BASE_DIR / ".daily_ftse_last_success"
-TARGET_TIME = time(16, 40)
+TARGET_TIME = time(16, 50)
 
 
 def should_run(now: datetime, last_success: str) -> bool:

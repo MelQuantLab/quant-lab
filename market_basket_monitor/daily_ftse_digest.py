@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import html
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -26,6 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent
 CONSTITUENT_CACHE = BASE_DIR / "ftse100_constituents.json"
 HTML_OUTPUT = BASE_DIR / "daily_ftse_digest.html"
 WORKBOOK_OUTPUT = BASE_DIR / "daily_ftse_dashboard.xlsx"
+CLOSE_CHECK_PATH = BASE_DIR / ".daily_ftse_close_check.json"
 LOGO_PATH = BASE_DIR / "assets" / "melquantlab-logo.jpg"
 FTSE_SOURCE = "https://en.wikipedia.org/wiki/FTSE_100_Index"
 BOE_DATA_URL = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp"
@@ -1038,7 +1040,13 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         ("week_pct", "5 days"),
         ("volume_ratio", "Volume / 20d"),
     ]
-    generated = datetime.now().astimezone().strftime("%A %d %B %Y, %H:%M %Z")
+    generated_at = datetime.now().astimezone()
+    generated = generated_at.strftime("%A %d %B %Y, %H:%M %Z")
+    report_title = (
+        "Daily Market Briefing"
+        if generated_at.time().replace(tzinfo=None) >= time(16, 50)
+        else "INTRADAY PREVIEW — NOT MARKET CLOSE"
+    )
     market_dates = ftse["as_of"].dropna().astype(str) if "as_of" in ftse else pd.Series(dtype=str)
     market_as_of = market_dates.mode().iloc[0] if not market_dates.empty else "unavailable"
     news_heading = "Three stories that matter" if len(news) == 3 else "Stories that matter"
@@ -1164,7 +1172,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
       <td class="brand-logo-cell" width="138" valign="middle" style="width:138px;padding-right:24px;"><img class="brand-logo" src="{logo_src}" alt="MelQuant Labs" width="106" height="106" style="display:block;width:106px;height:106px;border-radius:55px;border:2px solid #F6BD4A;"></td>
       <td valign="middle" style="min-width:0;overflow-wrap:break-word;">
         <div class="header-eyebrow" style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">MelQuant Labs · Closing Bell</div>
-        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:6px;">Daily Market Briefing</div>
+        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:6px;">{html.escape(report_title)}</div>
         <div class="header-subtitle" style="color:#9FB0C5;font-size:14px;margin-top:7px;">FTSE 100 &amp; Property Intelligence</div>
         <div style="color:#71869C;font-size:11px;margin-top:9px;">Data as of {html.escape(generated)}</div>
       </td>
@@ -1308,6 +1316,59 @@ def validate_delivery(frames: dict[str, pd.DataFrame], now: datetime | None = No
     return market_date.isoformat()
 
 
+def validate_stable_close(
+    frames: dict[str, pd.DataFrame],
+    now: datetime | None = None,
+    state_path: Path = CLOSE_CHECK_PATH,
+    minimum_minutes: int = 3,
+) -> str:
+    """Require two identical post-close FTSE snapshots several minutes apart."""
+    current = (now or datetime.now().astimezone()).astimezone()
+    if current.time().replace(tzinfo=None) < time(16, 50):
+        raise ValueError("market-close delivery is blocked before 16:50 London time")
+    market_date = validate_delivery(frames, current)
+    ftse = frames["FTSE 100"].sort_index()
+    payload = [
+        (str(ticker), str(row["as_of"]), round(float(row["price"]), 6))
+        for ticker, row in ftse.iterrows()
+    ]
+    signature = hashlib.sha256(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    previous = {}
+    try:
+        previous = json.loads(state_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    checked_at = datetime.fromisoformat(previous["checked_at"]) if previous.get("checked_at") else None
+    stable = (
+        previous.get("market_date") == market_date
+        and previous.get("signature") == signature
+        and checked_at is not None
+        and (current - checked_at).total_seconds() >= minimum_minutes * 60
+    )
+    first_seen = (
+        previous["checked_at"]
+        if previous.get("market_date") == market_date
+        and previous.get("signature") == signature
+        and previous.get("checked_at")
+        else current.isoformat()
+    )
+    state_path.write_text(
+        json.dumps(
+            {"market_date": market_date, "signature": signature, "checked_at": first_seen},
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if not stable:
+        raise ValueError(
+            f"waiting for a second unchanged FTSE snapshot at least {minimum_minutes} minutes apart"
+        )
+    return market_date
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Build files without emailing")
@@ -1319,8 +1380,8 @@ def main() -> None:
     print(f"[ok] HTML briefing written: {HTML_OUTPUT}")
     print(f"[ok] Excel dashboard written: {WORKBOOK_OUTPUT}")
     if not args.dry_run:
-        market_date = validate_delivery(frames)
-        print(f"[ok] delivery validation passed: FTSE market date {market_date}")
+        market_date = validate_stable_close(frames)
+        print(f"[ok] stable-close validation passed: FTSE market date {market_date}")
         subject_date = datetime.now().strftime("%d/%m/%Y")
         email_document = document.replace(
             f"data:image/jpeg;base64,{base64.b64encode(LOGO_PATH.read_bytes()).decode('ascii')}",

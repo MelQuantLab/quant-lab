@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -314,6 +316,35 @@ class DailyFtseDigestTests(unittest.TestCase):
             now=digest.datetime(2026, 8, 5, 16, 40).astimezone(),
         )
         self.assertEqual(result, "2026-08-05")
+
+    def test_stable_close_requires_two_unchanged_checks(self):
+        frame = pd.DataFrame(
+            {
+                "as_of": ["2026-08-05"] * 100,
+                "price": [100.0 + index for index in range(100)],
+                "day_pct": [0.0] * 100,
+            },
+            index=[f"T{i}.L" for i in range(100)],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "close-check.json"
+            first = digest.datetime(2026, 8, 5, 16, 50).astimezone()
+            with self.assertRaisesRegex(ValueError, "second unchanged"):
+                digest.validate_stable_close({"FTSE 100": frame}, first, state)
+            result = digest.validate_stable_close(
+                {"FTSE 100": frame}, first + digest.timedelta(minutes=3), state
+            )
+        self.assertEqual(result, "2026-08-05")
+
+    def test_stable_close_blocks_intraday_delivery(self):
+        frame = pd.DataFrame()
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "before 16:50"):
+                digest.validate_stable_close(
+                    {"FTSE 100": frame},
+                    digest.datetime(2026, 8, 5, 15, 0).astimezone(),
+                    Path(directory) / "close-check.json",
+                )
 
     @patch("daily_ftse_digest.fetch_news")
     def test_forward_watch_rejects_backward_looking_headlines(self, fetch_news):

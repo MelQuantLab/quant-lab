@@ -8,11 +8,11 @@ import run_daily_if_due as scheduler
 
 class DailySchedulerTests(unittest.TestCase):
     def test_runs_after_close_on_weekday(self):
-        now = datetime(2026, 8, 5, 16, 40)
+        now = datetime(2026, 8, 5, 16, 50)
         self.assertTrue(scheduler.should_run(now, ""))
 
     def test_does_not_run_before_close(self):
-        now = datetime(2026, 8, 5, 16, 39)
+        now = datetime(2026, 8, 5, 16, 49)
         self.assertFalse(scheduler.should_run(now, ""))
 
     def test_does_not_run_twice_on_same_day(self):

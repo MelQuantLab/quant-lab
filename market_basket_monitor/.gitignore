@@ -17,3 +17,4 @@ ftse100_constituents.json
 daily_ftse_digest.html
 daily_ftse_dashboard.xlsx
 .daily_ftse_last_success
+.daily_ftse_close_check.json
