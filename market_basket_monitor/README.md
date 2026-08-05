@@ -55,7 +55,7 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 Three sample macOS `launchd` configurations are included:
 
 - `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
-- `com.melquantlabs.marketmonitor.daily.plist` sends the FTSE 100 property-developer briefing at 17:30, Monday to Friday.
+- `com.melquantlabs.marketmonitor.daily.plist` refreshes and sends the FTSE 100 property-developer briefing at 16:40, Monday to Friday, using the Mac's local time zone.
 - `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.
@@ -170,9 +170,13 @@ Copy and load the schedules:
 ```bash
 cp com.melquantlabs.marketmonitor.alert.plist ~/Library/LaunchAgents/
 cp com.melquantlabs.marketmonitor.weekly.plist ~/Library/LaunchAgents/
+cp com.melquantlabs.marketmonitor.daily.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.alert.plist
 launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.weekly.plist
+launchctl load ~/Library/LaunchAgents/com.melquantlabs.marketmonitor.daily.plist
 ```
+
+The daily job uses the Mac's current time zone. Keep the Mac awake and connected to the internet around 16:40. If it is asleep at the scheduled time, macOS normally starts the missed calendar job after the Mac wakes.
 
 Unload them when required:
 
