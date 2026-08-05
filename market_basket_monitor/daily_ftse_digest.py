@@ -7,7 +7,7 @@ import argparse
 import base64
 import html
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -27,6 +27,7 @@ HTML_OUTPUT = BASE_DIR / "daily_ftse_digest.html"
 WORKBOOK_OUTPUT = BASE_DIR / "daily_ftse_dashboard.xlsx"
 LOGO_PATH = BASE_DIR / "assets" / "melquantlab-logo.jpg"
 FTSE_SOURCE = "https://en.wikipedia.org/wiki/FTSE_100_Index"
+BOE_DATA_URL = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp"
 
 UK_AUTOS = {
     "AUTO.L": "Auto Trader",
@@ -57,6 +58,67 @@ MARKET_DRIVERS = {
     "IGLT.L": "UK gilts ETF",
     "^VIX": "VIX",
 }
+
+PROPERTY_SECTOR_KEYWORDS = (
+    "Real Estate",
+    "Homebuilding",
+    "Construction Supplies",
+    "Construction and Materials",
+)
+
+UK_HOUSEBUILDERS = (
+    "Barratt",
+    "Berkeley",
+    "Bellway",
+    "Crest Nicholson",
+    "Persimmon",
+    "Redrow",
+    "Taylor Wimpey",
+    "Vistry",
+)
+
+
+def fetch_boe_property_rates() -> dict[str, dict[str, object]]:
+    """Fetch the latest official SONIA and Bank Rate observations from the BoE."""
+    today = datetime.now().date()
+    response = requests.get(
+        BOE_DATA_URL,
+        params={
+            "csv.x": "yes",
+            "Datefrom": (today - timedelta(days=45)).strftime("%d/%b/%Y"),
+            "Dateto": today.strftime("%d/%b/%Y"),
+            "SeriesCodes": "IUDSOIA,IUDBEDR",
+            "CSVF": "TN",
+            "UsingCodes": "Y",
+            "VPD": "Y",
+            "VFD": "N",
+        },
+        timeout=20,
+        headers={"User-Agent": "MelquantLabsMarketMonitor/1.0"},
+    )
+    response.raise_for_status()
+    frame = pd.read_csv(StringIO(response.text))
+    rates = {}
+    for code, label in (("IUDSOIA", "SONIA"), ("IUDBEDR", "Bank Rate")):
+        values = pd.to_numeric(frame.get(code), errors="coerce")
+        valid = frame.loc[values.notna(), ["DATE", code]]
+        if not valid.empty:
+            latest = valid.iloc[-1]
+            rates[label] = {
+                "value": float(latest[code]),
+                "as_of": str(latest["DATE"]),
+            }
+    return rates
+
+
+def property_exposure(frame: pd.DataFrame) -> pd.DataFrame:
+    """Select FTSE companies most relevant to property development and construction."""
+    if frame.empty or "sector" not in frame.columns:
+        return frame.iloc[0:0].copy()
+    sector_pattern = "|".join(PROPERTY_SECTOR_KEYWORDS)
+    sector_match = frame["sector"].str.contains(sector_pattern, case=False, na=False)
+    company_match = frame["company"].str.contains("|".join(UK_HOUSEBUILDERS), case=False, na=False)
+    return frame[sector_match | company_match].copy()
 
 
 def yahoo_lse_ticker(epic: str) -> str:
@@ -524,6 +586,10 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     drivers = attach_names(
         snapshot.loc[snapshot.index.intersection(MARKET_DRIVERS)], MARKET_DRIVERS
     )
+    try:
+        property_rates = fetch_boe_property_rates()
+    except Exception:
+        property_rates = {}
 
     gainers = ftse.sort_values("day_pct", ascending=False).head(5)
     fallers = ftse.sort_values("day_pct").head(5)
@@ -534,6 +600,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         .sort_values(ascending=False)
         .to_frame("day_pct")
     )
+    property_names = property_exposure(ftse).sort_values("day_pct", ascending=False)
     news_names = notable["company"].tolist() if not notable.empty else gainers["company"].tolist()
     news = collect_ranked_news(news_names)
     forward_news = collect_forward_watch()
@@ -585,6 +652,21 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     auto_month = auto_row.iloc[0]["month_pct"] if not auto_row.empty else None
     auto_volume = auto_row.iloc[0]["volume_ratio"] if not auto_row.empty else None
     auto_price = auto_row.iloc[0]["price"] if not auto_row.empty else None
+    sonia = property_rates.get("SONIA", {}).get("value")
+    sonia_as_of = property_rates.get("SONIA", {}).get("as_of", "official latest")
+    bank_rate = property_rates.get("Bank Rate", {}).get("value")
+    bank_rate_as_of = property_rates.get("Bank Rate", {}).get("as_of", "official latest")
+    gilt_move = drivers.loc["IGLT.L", "day_pct"] if "IGLT.L" in drivers.index else None
+    sterling_move = drivers.loc["GBPUSD=X", "day_pct"] if "GBPUSD=X" in drivers.index else None
+    property_average = property_names["day_pct"].mean() if not property_names.empty else None
+    property_read = (
+        f"The listed property, housebuilding and construction basket moved {_format_pct(property_average)} "
+        f"on average. SONIA is {'unavailable' if sonia is None else f'{sonia:.4f}%'} and Bank Rate is "
+        f"{'unavailable' if bank_rate is None else f'{bank_rate:.2f}%'}. The UK gilt proxy moved "
+        f"{_format_pct(gilt_move)} and sterling moved {_format_pct(sterling_move)} against the dollar. "
+        "For Lotus Knor, watch refinancing costs, planning and construction updates, land values and "
+        "buyer affordability together rather than relying on property-share prices alone."
+    )
     sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
     pm_summary = build_pm_summary(
         ftse, sector_moves, drivers, auto_row, news, forward_news
@@ -628,8 +710,8 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       <td width="92" valign="middle"><img src="{logo_src}" alt="Melquant Labs" width="76" height="76" style="display:block;border-radius:38px;border:1px solid #F6BD4A;"></td>
       <td valign="middle">
-        <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Autos Intelligence</div>
-        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">Daily Autos &amp; FTSE Close</div>
+        <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Closing Bell · Autos &amp; Property Intelligence</div>
+        <div class="headline" style="color:#F7FAFC;font-size:28px;font-weight:700;line-height:1.15;margin-top:5px;">Daily Autos, Property &amp; FTSE Close</div>
         <div style="color:#8EA5BD;font-size:12px;margin-top:7px;">{html.escape(generated)} · ANALYZE <span style="color:#F6BD4A;">•</span> MODEL <span style="color:#46CFF5;">•</span> ALPHA</div>
       </td>
     </tr></table>
@@ -673,6 +755,17 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     {_table(global_autos.sort_values('day_pct', ascending=False), columns)}
     {_section_title('Cross-market context', 'Sector leadership')}
     {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')])}
+    {_section_title('Lotus Knor lens', 'Property & Infrastructure')}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0 5px;"><tr>
+      {_metric_card('SONIA', '—' if sonia is None else f'{sonia:.4f}%', '#F6BD4A', f'BoE · {sonia_as_of}')}
+      {_metric_card('Bank Rate', '—' if bank_rate is None else f'{bank_rate:.2f}%', '#F7FAFC', f'BoE · {bank_rate_as_of}')}
+      {_metric_card('UK gilts proxy', _format_pct(gilt_move), _move_colour(gilt_move), 'IGLT daily move')}
+      {_metric_card('GBP/USD', _format_pct(sterling_move), _move_colour(sterling_move), 'currency pressure')}
+    </tr></table>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #46CFF5;border-radius:10px;margin:10px 5px 16px;">
+      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Property investor read-through:</strong> {html.escape(property_read)}</td></tr>
+    </table>
+    {_table(property_names, columns, limit=10)}
     {_section_title('Cross-market context', 'Drivers dashboard')}
     {_table(drivers, columns)}
     {_section_title('Portfolio manager close', 'Daily PM Summary')}
@@ -694,6 +787,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
         "Global Autos": global_autos,
         "Market Drivers": drivers,
         "Sector Moves": sector_moves,
+        "Property & Infrastructure": property_names,
     }
     return document, frames, news
 
@@ -735,7 +829,7 @@ def main() -> None:
             "cid:melquantlabs-logo",
         )
         send_email(
-            f"Melquant Labs Closing Bell | Autos & FTSE | {subject_date}",
+            f"Melquant Labs Closing Bell | Autos, Property & FTSE | {subject_date}",
             email_document,
             inline_images={"melquantlabs-logo": LOGO_PATH},
         )

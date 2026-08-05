@@ -2,7 +2,7 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
-It also includes a weekday FTSE 100 and automotive-sector closing briefing with market leaders and laggards, unusual moves, three notable headlines, an Auto Trader company card, UK and global automotive peers, sector performance, key market drivers and a sub-500-word portfolio-manager closing summary.
+It also includes a weekday FTSE 100, automotive and property closing briefing with market leaders and laggards, unusual moves, three notable headlines, an Auto Trader company card, UK and global automotive peers, sector performance, key market drivers and a sub-500-word portfolio-manager closing summary. A dedicated Lotus Knor property lens tracks relevant FTSE real-estate, housebuilding and construction names alongside official Bank of England SONIA and Bank Rate observations, UK gilts and sterling.
 
 The project currently uses Auto Trader Group (`AUTO.L`) as a simple starting example. The basket can be expanded to include other equities, indices, exchange-traded funds, or Yahoo Finance instruments.
 
@@ -55,7 +55,7 @@ Positive and negative moves are colour-coded, while triggered alerts are highlig
 Three sample macOS `launchd` configurations are included:
 
 - `com.melquantlabs.marketmonitor.alert.plist` runs the monitoring check every 30 minutes.
-- `com.melquantlabs.marketmonitor.daily.plist` sends the FTSE 100 and autos briefing at 17:30, Monday to Friday.
+- `com.melquantlabs.marketmonitor.daily.plist` sends the FTSE 100, autos and property briefing at 17:30, Monday to Friday.
 - `com.melquantlabs.marketmonitor.weekly.plist` runs the weekly digest each Monday at 08:00.
 
 An optional VBA module and AppleScript helper provide manual refresh controls from Excel for Mac.
@@ -141,7 +141,7 @@ Generate the weekly dashboard update and email digest:
 python3 market_monitor.py --mode weekly
 ```
 
-Build the daily FTSE 100 and autos briefing without sending it:
+Build the daily FTSE 100, autos and property briefing without sending it:
 
 ```bash
 python3 daily_ftse_digest.py --dry-run

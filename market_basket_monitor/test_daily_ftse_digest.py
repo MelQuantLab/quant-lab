@@ -32,6 +32,39 @@ class DailyFtseDigestTests(unittest.TestCase):
 
         self.assertEqual(result.loc["TEST.L", "company"], "TEST.L")
 
+    def test_property_exposure_selects_relevant_ftse_sectors(self):
+        frame = pd.DataFrame(
+            {
+                "company": ["Property REIT", "Barratt Redrow", "Consumer plc"],
+                "sector": [
+                    "Real Estate Investment Trusts",
+                    "Household goods & home construction",
+                    "Banks",
+                ],
+                "day_pct": [1.0, -0.5, 0.2],
+            },
+            index=["REIT.L", "BUILD.L", "BANK.L"],
+        )
+
+        result = digest.property_exposure(frame)
+
+        self.assertEqual(set(result.index), {"REIT.L", "BUILD.L"})
+
+    @patch("daily_ftse_digest.requests.get")
+    def test_boe_property_rates_uses_latest_available_observation(self, get):
+        get.return_value.text = (
+            "DATE,IUDSOIA,IUDBEDR\n"
+            "03 Aug 2026,3.7321,3.75\n"
+            "04 Aug 2026,,3.75\n"
+        )
+        get.return_value.raise_for_status.return_value = None
+
+        result = digest.fetch_boe_property_rates()
+
+        self.assertEqual(result["SONIA"]["value"], 3.7321)
+        self.assertEqual(result["SONIA"]["as_of"], "03 Aug 2026")
+        self.assertEqual(result["Bank Rate"]["value"], 3.75)
+
     def test_move_colours_distinguish_direction(self):
         self.assertEqual(digest._move_colour(1.0), "#34D6A2")
         self.assertEqual(digest._move_colour(-1.0), "#FF6B7A")
