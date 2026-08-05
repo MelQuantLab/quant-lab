@@ -2,7 +2,7 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
-It also includes a weekday FTSE 100 and automotive-sector closing briefing with market leaders and laggards, unusual moves, three notable headlines, an Auto Trader company card, UK and global automotive peers, sector performance and key market drivers.
+It also includes a weekday FTSE 100 and automotive-sector closing briefing with market leaders and laggards, unusual moves, three notable headlines, an Auto Trader company card, UK and global automotive peers, sector performance, key market drivers and a sub-500-word portfolio-manager closing summary.
 
 The project currently uses Auto Trader Group (`AUTO.L`) as a simple starting example. The basket can be expanded to include other equities, indices, exchange-traded funds, or Yahoo Finance instruments.
 
@@ -200,7 +200,8 @@ macOS may request permission for Excel to run the AppleScript helper.
 ## Data sources and limitations
 
 - Price data is provided by Yahoo Finance through `yfinance` and may be delayed, incomplete, or revised.
-- News is collected from Google News RSS and may include duplicate or loosely related results.
+- News is discovered through Google News RSS, attributed to its publisher and ranked to favour sources such as Reuters, Bloomberg, the Financial Times, Yahoo Finance and established UK outlets. Availability varies and paywalled article text is not bypassed.
+- The Daily PM Summary combines the calculated market tape with attributed headlines. Forward-looking headlines are included only when they are explicitly relevant to the UK market or automotive sector; otherwise the report supplies a general watchlist and asks the reader to verify dates at the company or exchange.
 - The monitor runs locally and therefore depends on the Mac being powered on with network access.
 - It is a research and monitoring tool, not an execution system or source of investment advice.
 - The current version uses a straightforward percentage threshold rather than a statistically calibrated risk model.

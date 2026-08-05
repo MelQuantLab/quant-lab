@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -60,6 +61,61 @@ class DailyFtseDigestTests(unittest.TestCase):
         runner_up_cell = table.split("Runner-up plc", 1)[0].rsplit("<td", 1)[-1]
         self.assertIn("font-weight:800", winner_cell)
         self.assertIn("font-weight:500", runner_up_cell)
+
+    def test_story_normalisation_separates_publisher(self):
+        story = digest._normalise_story(
+            {"title": "UK shares close higher - Reuters", "link": "https://example.com"}
+        )
+
+        self.assertEqual(story["title"], "UK shares close higher")
+        self.assertEqual(story["source"], "Reuters")
+
+    def test_pm_summary_is_concise_and_data_led(self):
+        ftse = pd.DataFrame(
+            {
+                "company": ["Winner plc", "Laggard plc"],
+                "day_pct": [4.0, -3.0],
+            },
+            index=["WIN.L", "LAG.L"],
+        )
+        sectors = pd.DataFrame(
+            {"day_pct": [1.5, -1.2]}, index=["Technology", "Healthcare"]
+        )
+        drivers = pd.DataFrame(
+            {"day_pct": [0.5, -1.0]}, index=["^FTSE", "BZ=F"]
+        )
+        auto = pd.DataFrame(
+            {"day_pct": [1.0], "week_pct": [2.0]}, index=["AUTO.L"]
+        )
+        news = [
+            {
+                "title": "Company issues trading update",
+                "source": "Reuters",
+                "link": "https://example.com/story",
+            }
+        ]
+
+        paragraphs = digest.build_pm_summary(
+            ftse, sectors, drivers, auto, news, forward_news=[]
+        )
+        summary = " ".join(paragraphs)
+
+        self.assertIn("Winner plc", summary)
+        self.assertIn("Auto Trader", summary)
+        self.assertIn("Reuters", summary)
+        self.assertLessEqual(len(summary.split()), 500)
+
+    @patch("daily_ftse_digest.fetch_news")
+    def test_forward_watch_rejects_backward_looking_headlines(self, fetch_news):
+        fetch_news.return_value = [
+            {"title": "FTSE 100 closed higher - Reuters", "link": "https://a"},
+            {"title": "Week ahead: UK earnings to watch - Reuters", "link": "https://b"},
+        ]
+
+        stories = digest.collect_forward_watch()
+
+        self.assertEqual(len(stories), 1)
+        self.assertEqual(stories[0]["title"], "Week ahead: UK earnings to watch")
 
 
 if __name__ == "__main__":

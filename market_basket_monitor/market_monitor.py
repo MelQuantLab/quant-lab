@@ -137,7 +137,17 @@ def fetch_news(query, max_items=3, days_back=None):
             published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
         if cutoff and published and published < cutoff:
             continue
-        items.append({"title": entry.title, "link": entry.link, "published": published})
+        source = ""
+        if getattr(entry, "source", None):
+            source = str(getattr(entry.source, "title", "") or "").strip()
+        items.append(
+            {
+                "title": entry.title,
+                "link": entry.link,
+                "published": published,
+                "source": source,
+            }
+        )
         if len(items) >= max_items:
             break
     return items

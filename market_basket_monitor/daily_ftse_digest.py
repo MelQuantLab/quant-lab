@@ -197,23 +197,191 @@ def notable_moves(snapshot: pd.DataFrame) -> pd.DataFrame:
     return snapshot[(snapshot["day_pct"].abs() >= 3.0) | (volume >= 2.0)].copy()
 
 
+TRUSTED_NEWS_SOURCES = {
+    "reuters": 100,
+    "financial times": 95,
+    "bloomberg": 95,
+    "yahoo finance": 90,
+    "bbc": 85,
+    "sky news": 80,
+    "the guardian": 75,
+    "city a.m.": 75,
+    "this is money": 70,
+    "proactive investors": 65,
+}
+
+
+def _normalise_story(story: dict) -> dict:
+    """Separate Google News' source suffix and preserve source attribution."""
+    result = dict(story)
+    title = str(result.get("title", "")).strip()
+    source = str(result.get("source", "") or "").strip()
+    if not source and " - " in title:
+        title, source = title.rsplit(" - ", 1)
+    elif source and title.endswith(f" - {source}"):
+        title = title[: -(len(source) + 3)]
+    result["title"] = title.strip()
+    result["source"] = source.strip()
+    return result
+
+
+def _story_rank(story: dict) -> tuple[int, float]:
+    source = str(story.get("source", "")).lower()
+    trust_score = max(
+        (score for name, score in TRUSTED_NEWS_SOURCES.items() if name in source),
+        default=50,
+    )
+    published = story.get("published")
+    timestamp = published.timestamp() if published else 0.0
+    return trust_score, timestamp
+
+
 def collect_ranked_news(company_names: list[str], limit: int = 3) -> list[dict]:
-    """Collect distinct, recent headlines for the market and notable movers."""
+    """Collect and rank recent headlines from reputable publishers."""
     queries = ["FTSE 100 earnings CEO trading update"]
     queries.extend(company_names[:5])
     queries.append("Auto Trader UK automotive market")
     stories = []
     seen = set()
     for query in queries:
-        for story in fetch_news(query, max_items=3, days_back=2):
+        for raw_story in fetch_news(query, max_items=5, days_back=2):
+            story = _normalise_story(raw_story)
             key = story["title"].lower().strip()
             if key in seen:
                 continue
             seen.add(key)
             stories.append(story)
-            if len(stories) >= limit:
-                return stories
-    return stories
+    return sorted(stories, key=_story_rank, reverse=True)[:limit]
+
+
+def collect_forward_watch(limit: int = 3) -> list[dict]:
+    """Find recent forward-looking headlines without inventing calendar events."""
+    forward_terms = (
+        "week ahead",
+        "what to watch",
+        "set to report",
+        "due to report",
+        "earnings calendar",
+        "results calendar",
+        "upcoming",
+        "next week",
+        "tomorrow",
+        "outlook",
+        "forecast",
+        "expected to",
+    )
+    relevance_terms = (
+        "ftse",
+        "uk ",
+        "britain",
+        "british",
+        "london",
+        "sterling",
+        "auto trader",
+        "automotive",
+        "car ",
+        "vehicle",
+        "smmt",
+    )
+    queries = [
+        "FTSE 100 earnings this week outlook Reuters OR Bloomberg OR Financial Times",
+        "UK market week ahead earnings economic data",
+        "UK automotive industry outlook Auto Trader SMMT",
+    ]
+    stories = []
+    seen = set()
+    for query in queries:
+        for raw_story in fetch_news(query, max_items=5, days_back=7):
+            story = _normalise_story(raw_story)
+            key = story["title"].lower().strip()
+            if (
+                not key
+                or key in seen
+                or not any(term in key for term in forward_terms)
+                or not any(term in key for term in relevance_terms)
+            ):
+                continue
+            seen.add(key)
+            stories.append(story)
+    return sorted(stories, key=_story_rank, reverse=True)[:limit]
+
+
+def build_pm_summary(
+    ftse: pd.DataFrame,
+    sector_moves: pd.DataFrame,
+    drivers: pd.DataFrame,
+    auto_row: pd.DataFrame,
+    news: list[dict],
+    forward_news: list[dict],
+) -> list[str]:
+    """Create a concise, data-led closing note capped safely below 500 words."""
+    ftse_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
+    advancers = int((ftse["day_pct"] > 0).sum()) if not ftse.empty else 0
+    decliners = int((ftse["day_pct"] < 0).sum()) if not ftse.empty else 0
+    gainers = ftse.sort_values("day_pct", ascending=False) if not ftse.empty else ftse
+    fallers = ftse.sort_values("day_pct") if not ftse.empty else ftse
+    leader = str(gainers.iloc[0]["company"]) if not gainers.empty else "the leading constituent"
+    leader_move = gainers.iloc[0]["day_pct"] if not gainers.empty else None
+    laggard = str(fallers.iloc[0]["company"]) if not fallers.empty else "the weakest constituent"
+    laggard_move = fallers.iloc[0]["day_pct"] if not fallers.empty else None
+    market_tone = "advanced" if ftse_move is not None and ftse_move > 0 else "declined" if ftse_move is not None and ftse_move < 0 else "finished broadly unchanged"
+
+    paragraphs = [
+        (
+            f"The FTSE 100 {market_tone} {_format_pct(ftse_move)}, with {advancers} advancers "
+            f"against {decliners} decliners. {leader} led the index at {_format_pct(leader_move)}, "
+            f"while {laggard} was the weakest name at {_format_pct(laggard_move)}."
+        )
+    ]
+
+    if not sector_moves.empty:
+        strongest_sector = str(sector_moves.index[0])
+        weakest_sector = str(sector_moves.index[-1])
+        paragraphs.append(
+            f"At sector level, {strongest_sector} showed the strongest average performance, "
+            f"while {weakest_sector} lagged. This breadth is worth comparing with the individual "
+            "stock moves above before treating an outsized move as company-specific."
+        )
+
+    if not auto_row.empty:
+        auto_move = auto_row.iloc[0]["day_pct"]
+        relative = auto_move - ftse_move if ftse_move is not None else None
+        auto_week = auto_row.iloc[0].get("week_pct")
+        brent = drivers.loc["BZ=F", "day_pct"] if "BZ=F" in drivers.index else None
+        paragraphs.append(
+            f"For priority coverage, Auto Trader moved {_format_pct(auto_move)} on the day and "
+            f"{_format_pct(relative)} relative to the FTSE 100; its five-day move is "
+            f"{_format_pct(auto_week)}. Brent moved {_format_pct(brent)}, an important read-through "
+            "for automotive demand, consumer costs and manufacturer margins."
+        )
+
+    if news:
+        headline_text = "; ".join(
+            f"{story['title']} ({story.get('source') or 'source linked above'})"
+            for story in news[:3]
+        )
+        paragraphs.append(f"The principal reported catalysts were: {headline_text}.")
+
+    if forward_news:
+        watch_text = "; ".join(
+            f"{story['title']} ({story.get('source') or 'source linked below'})"
+            for story in forward_news[:3]
+        )
+        paragraphs.append(
+            f"Looking ahead, monitor: {watch_text}. Treat these as a watchlist rather than a "
+            "confirmed event calendar, and verify timing at the linked source."
+        )
+    else:
+        paragraphs.append(
+            "Looking ahead, monitor scheduled company statements, UK macro releases, sterling, "
+            "oil and any overnight moves in global automotive peers. Confirm event timing with the "
+            "company or exchange before the next session."
+        )
+
+    words = " ".join(paragraphs).split()
+    if len(words) > 480:
+        return [" ".join(words[:480]).rstrip(".,;:") + "."]
+    return paragraphs
 
 
 def _format_pct(value) -> str:
@@ -333,6 +501,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     )
     news_names = notable["company"].tolist() if not notable.empty else gainers["company"].tolist()
     news = collect_ranked_news(news_names)
+    forward_news = collect_forward_watch()
 
     auto_row = uk_autos.loc[["AUTO.L"]] if "AUTO.L" in uk_autos.index else pd.DataFrame()
     ftse_index_move = drivers.loc["^FTSE", "day_pct"] if "^FTSE" in drivers.index else None
@@ -347,6 +516,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
           </td>
           <td valign="top" style="padding:12px 0;border-bottom:1px solid #294B6B;">
             <div style="color:#F7FAFC;font-size:15px;font-weight:700;line-height:1.35;">{html.escape(story["title"])}</div>
+            <div style="color:#F6BD4A;font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;margin-top:5px;">{html.escape(story.get("source") or "Linked publisher")}</div>
             <div style="color:#9FB0C5;font-size:12px;line-height:1.45;margin-top:5px;">Potential market or automotive-sector catalyst. Verify the detail and timing at source.</div>
             <a href="{html.escape(story["link"], quote=True)}" style="display:inline-block;color:#46CFF5;font-size:12px;font-weight:700;text-decoration:none;margin-top:7px;">READ SOURCE →</a>
           </td>
@@ -381,6 +551,19 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     auto_volume = auto_row.iloc[0]["volume_ratio"] if not auto_row.empty else None
     auto_price = auto_row.iloc[0]["price"] if not auto_row.empty else None
     sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
+    pm_summary = build_pm_summary(
+        ftse, sector_moves, drivers, auto_row, news, forward_news
+    )
+    pm_summary_html = "".join(
+        f'<p style="margin:0 0 12px;color:#DCE8F4;font-size:14px;line-height:1.65;">{html.escape(paragraph)}</p>'
+        for paragraph in pm_summary
+    )
+    forward_links_html = "".join(
+        f'<li style="margin:0 0 7px;"><a href="{html.escape(story["link"], quote=True)}" '
+        f'style="color:#46CFF5;text-decoration:none;">{html.escape(story["title"])}</a>'
+        f'<span style="color:#71869C;"> — {html.escape(story.get("source") or "publisher")}</span></li>'
+        for story in forward_news
+    )
     logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
     logo_src = f"data:image/jpeg;base64,{logo_data}"
 
@@ -452,6 +635,11 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')])}
     {_section_title('Cross-market context', 'Drivers dashboard')}
     {_table(drivers, columns)}
+    {_section_title('Portfolio manager close', 'Daily PM Summary')}
+    <table id="daily-pm-summary" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border:1px solid #31567E;border-left:4px solid #F6BD4A;border-radius:12px;margin:10px 0 10px;">
+      <tr><td style="padding:18px 20px;">{pm_summary_html}</td></tr>
+    </table>
+    {f'<div style="color:#8EA5BD;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin:14px 0 7px;">Forward-watch sources</div><ul style="margin:0 0 25px;padding-left:20px;color:#9FB0C5;font-size:11px;line-height:1.5;">{forward_links_html}</ul>' if forward_links_html else ''}
   </td></tr>
   <tr><td class="footer-pad" style="background:#07121F;padding:22px 30px;border-top:1px solid #254A6B;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
