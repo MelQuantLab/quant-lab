@@ -2,7 +2,7 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
-It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The briefing starts with the full-index market pulse, leaders, laggards and notable news, then maps the market directly to a developer's decisions: capital and finance, materials and infrastructure, real-estate bellwethers, housebuilder competition, consumer spending power and the next-session watchlist. A sub-500-word closing note converts the data into a concise Lotus Knor read-through.
+It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The briefing starts with the full-index market pulse, leaders, laggards and notable news, then maps the market directly to a developer's decisions: capital and finance, materials and infrastructure, real-estate bellwethers, housebuilder competition, consumer spending power and the next-session watchlist. A sub-500-word closing note converts the data into a concise Lotus Noor Developments read-through.
 
 The configurable intraday alert monitor still uses Auto Trader Group (`AUTO.L`) as its simple example basket. It is independent of the property-focused daily closing briefing and can be expanded to other instruments.
 

@@ -768,7 +768,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     property_read = (
         f"FTSE real-estate bellwethers averaged {_format_pct(real_estate_average)} and the housebuilder "
         f"basket averaged {_format_pct(housebuilder_average)}. Lenders averaged {_format_pct(bank_average)} "
-        f"and materials proxies averaged {_format_pct(materials_average)}. For Lotus Knor, read financing, "
+        f"and materials proxies averaged {_format_pct(materials_average)}. For Lotus Noor Developments, read financing, "
         "build costs and buyer demand together—no single share-price move is a development decision."
     )
     sector_display = pd.concat([sector_moves.head(4), sector_moves.tail(4)]).drop_duplicates()
@@ -874,7 +874,7 @@ def build_digest() -> tuple[str, dict[str, pd.DataFrame], list[dict]]:
     </tr></table>
     {_table(consumers.sort_values('day_pct', ascending=False), columns, emphasise_extremes=True)}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#102A47;border-left:4px solid #46CFF5;border-radius:10px;margin:10px 5px 16px;">
-      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Lotus Knor read-through:</strong> {html.escape(property_read)}</td></tr>
+      <tr><td style="padding:15px 18px;color:#DCE8F4;font-size:13px;line-height:1.55;"><strong style="color:#FFFFFF;">Lotus Noor Developments Focus Lens:</strong> {html.escape(property_read)}</td></tr>
     </table>
     {_section_title('FTSE 100 context', 'Sector Leadership')}
     {_table(sector_display, [('ticker','Sector'),('day_pct','Average move')], emphasise_extremes=True)}
