@@ -235,7 +235,7 @@ class DailyFtseDigestTests(unittest.TestCase):
         )
         self.assertLessEqual(len(summary.split()), 500)
 
-    def test_alpha_view_has_four_distinct_time_horizons(self):
+    def test_alpha_view_has_three_distinct_time_horizons(self):
         ftse = pd.DataFrame(
             {"company": ["Leader plc"], "day_pct": [2.5], "month_pct": [5.0]},
             index=["LEAD.L"],
@@ -257,11 +257,11 @@ class DailyFtseDigestTests(unittest.TestCase):
 
         self.assertEqual(
             [idea["horizon"] for idea in ideas],
-            ["1 Day", "1 Week", "14 Days", "1 Month"],
+            ["1 Day", "1 Week", "1 Month"],
         )
         self.assertIn("Company announces results", ideas[0]["thesis"])
-        self.assertIn("UK inflation data due", ideas[2]["thesis"])
-        self.assertIn("SONIA", ideas[3]["thesis"])
+        self.assertIn("UK inflation data due", ideas[1]["thesis"])
+        self.assertIn("SONIA", ideas[2]["thesis"])
 
     def test_alpha_view_matches_headline_to_named_company(self):
         ftse = pd.DataFrame(
@@ -284,16 +284,6 @@ class DailyFtseDigestTests(unittest.TestCase):
 
         self.assertEqual(ideas[0]["title"], "Catalyst follow-through: SEGRO")
         self.assertIn("+1.20%", ideas[0]["thesis"])
-
-    def test_alpha_view_does_not_invent_fortnight_catalyst(self):
-        frame = pd.DataFrame(
-            {"company": ["Example plc"], "day_pct": [1.0], "month_pct": [2.0]},
-            index=["EX.L"],
-        )
-        ideas = digest.build_alpha_view(frame, {"Industrials": frame}, frame, pd.DataFrame(), {}, [], [])
-
-        self.assertEqual(ideas[2]["title"], "No verified 14-day catalyst")
-        self.assertIn("No investment hypothesis is asserted", ideas[2]["thesis"])
 
     def test_delivery_validation_rejects_stale_market_tape(self):
         frame = pd.DataFrame(

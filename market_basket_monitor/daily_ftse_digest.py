@@ -868,7 +868,6 @@ def build_alpha_view(
     strongest = max(sector_averages, key=sector_averages.get) if sector_averages else "FTSE leaders"
     weakest = min(sector_averages, key=sector_averages.get) if sector_averages else "FTSE laggards"
     next_catalyst = forward_news[0]["title"] if forward_news else "the next UK macro and company calendar"
-    fortnight_catalysts = "; ".join(story["title"] for story in forward_news[:3])
 
     property_tape = pd.concat([real_estate, housebuilders]).drop_duplicates()
     property_tape = property_tape.sort_values("month_pct", ascending=False) if not property_tape.empty else property_tape
@@ -892,16 +891,6 @@ def build_alpha_view(
             "risk": "One session does not establish a trend; macro data, earnings and index concentration can quickly reverse the relationship.",
         },
         {
-            "horizon": "14 Days",
-            "title": "Verified catalyst window" if fortnight_catalysts else "No verified 14-day catalyst",
-            "thesis": (
-                f"Monitor these attributed forward-looking reports: {fortnight_catalysts}. Confirm each date at the linked publisher before acting."
-                if fortnight_catalysts
-                else "The free feeds returned no specific, attributable two-week event. No investment hypothesis is asserted for this horizon."
-            ),
-            "risk": "Headline feeds are not an official earnings calendar; event dates can change and must be checked against company RNS or an official release calendar.",
-        },
-        {
             "horizon": "1 Month",
             "title": f"Rates and property repricing: {property_name}",
             "thesis": f"{property_name} has returned {property_month} over one month while SONIA stands at {sonia_text}. Track whether easing finance conditions support property and housebuilder relative performance.",
@@ -914,7 +903,6 @@ def _alpha_view_html(ideas: list[dict[str, str]]) -> str:
     colours = {
         "1 Day": "#F6BD4A",
         "1 Week": "#46CFF5",
-        "14 Days": "#34D6A2",
         "1 Month": "#A78BFA",
     }
     cards = []

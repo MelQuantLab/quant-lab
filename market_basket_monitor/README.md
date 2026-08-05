@@ -2,7 +2,7 @@
 
 A Python-based market monitoring workflow for macOS that tracks a configurable basket of securities, identifies significant price movements, gathers relevant news, and maintains an Excel dashboard for ongoing review.
 
-It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The briefing starts with a clean FTSE overview and a separate property-developer pulse, then maps the market directly to a developer's decisions: capital and finance, materials and infrastructure, real-estate bellwethers, housebuilder competition, consumer spending power and the next-session watchlist. An Alpha View turns the latest news, market tape and upcoming catalysts into clearly labelled one-day, one-week, 14-day and one-month research hypotheses. The 14-day lens concentrates on earnings, company statements and scheduled macro events. A sub-500-word closing note leads with the immediate actions and then adds concise autos, financials, technology and macro summaries.
+It also includes a weekday **FTSE 100 Property Developer Closing Bell**. The briefing starts with a clean FTSE overview and a separate property-developer pulse, then maps the market directly to a developer's decisions: capital and finance, materials and infrastructure, real-estate bellwethers, housebuilder competition, consumer spending power and the next-session watchlist. An Alpha View turns the latest news and market tape into clearly labelled one-day, one-week and one-month research hypotheses. A sub-500-word closing note leads with the immediate actions and then adds concise autos, financials, technology and macro summaries.
 
 The configurable intraday alert monitor still uses Auto Trader Group (`AUTO.L`) as its simple example basket. It is independent of the property-focused daily closing briefing and can be expanded to other instruments.
 
@@ -214,7 +214,6 @@ macOS may request permission for Excel to run the AppleScript helper.
 
 - Price data is provided by Yahoo Finance through `yfinance` and may be delayed, incomplete, or revised.
 - News is discovered through Google News RSS, attributed to its publisher and ranked to favour sources such as Reuters, Bloomberg, the Financial Times, Yahoo Finance and established UK outlets. The monitor receives headline metadata and links only: it does not read or summarise the full Bloomberg, Financial Times or Reuters article body, and paywalls are not bypassed.
-- The 14-day Alpha View only names a catalyst when a specific attributed forward-looking headline is returned. If none is found, it says so rather than substituting a generic calendar instruction or fabricated investment idea.
 - Before any email is sent, the monitor requires at least 90 FTSE constituents carrying the current London market date. Stale or materially incomplete price data causes the delivery to fail and retry rather than presenting old figures as today's close.
 - Official SONIA and Bank Rate observations come from the Bank of England statistical database and display their observation dates.
 - Broad FTSE 100 sector weights are sourced from the latest public sector breakdown for the iShares Core FTSE 100 UCITS ETF (ISF) and are labelled as an index-tracker proxy with their observation date.
