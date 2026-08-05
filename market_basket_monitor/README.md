@@ -98,10 +98,11 @@ Open `.env` and enter the email account details used for delivery:
 BT_EMAIL_USER=your-email@example.com
 BT_EMAIL_PASSWORD=your-app-password
 EMAIL_FROM=your-email@example.com
+EMAIL_FROM_NAME=MelQuant Labs
 EMAIL_TO=first-recipient@example.com,second-recipient@example.com
 ```
 
-Separate multiple recipients with commas. Keep `.env` private: it is already excluded by `.gitignore` and should never be committed.
+Separate multiple recipients with commas. Recipients are delivered through the private SMTP envelope and are not exposed in the visible `To` header. `EMAIL_FROM_NAME` controls the professional sender name shown by the recipient's mail application. Keep `.env` private: it is already excluded by `.gitignore` and should never be committed.
 
 ## Configuration
 

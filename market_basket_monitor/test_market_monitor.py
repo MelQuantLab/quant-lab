@@ -1,4 +1,7 @@
 import unittest
+import os
+from email import message_from_string
+from unittest.mock import patch
 
 from openpyxl import Workbook
 
@@ -51,6 +54,33 @@ class EvaluateQuotesTests(unittest.TestCase):
         sheet = workbook["Live"]
         self.assertEqual(sheet.cell(row=2, column=4).value, 3.0)
         self.assertEqual(sheet.cell(row=2, column=5).value, "ALERT")
+
+
+class EmailPrivacyTests(unittest.TestCase):
+    @patch("market_monitor.smtplib.SMTP")
+    def test_sender_brand_and_recipient_list_are_private(self, smtp):
+        settings = {
+            "SMTP_HOST": "smtp.example.com",
+            "SMTP_PORT": "587",
+            "SMTP_SECURITY": "starttls",
+            "SMTP_USER": "sender@example.com",
+            "SMTP_PASSWORD": "private-password",
+            "EMAIL_FROM": "sender@example.com",
+            "EMAIL_FROM_NAME": "MelQuant Labs",
+            "EMAIL_TO": "first@example.com,second@example.com",
+        }
+        with patch.dict(os.environ, settings, clear=False):
+            market_monitor.send_email("Daily briefing", "<p>Report</p>")
+
+        server = smtp.return_value
+        envelope_from, envelope_to, raw_message = server.sendmail.call_args.args
+        message = message_from_string(raw_message)
+
+        self.assertEqual(envelope_from, "sender@example.com")
+        self.assertEqual(envelope_to, ["first@example.com", "second@example.com"])
+        self.assertEqual(message["From"], "MelQuant Labs <sender@example.com>")
+        self.assertEqual(message["To"], "Undisclosed recipients:;")
+        self.assertIsNone(message["Bcc"])
 
 
 if __name__ == "__main__":

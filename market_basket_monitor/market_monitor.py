@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from pathlib import Path
 
 import yfinance as yf
@@ -174,6 +175,7 @@ def send_email(subject, html_body, inline_images=None):
     user = os.environ.get("SMTP_USER") or os.environ.get("BT_EMAIL_USER")
     password = os.environ.get("SMTP_PASSWORD") or os.environ.get("BT_EMAIL_PASSWORD")
     email_from = os.environ.get("EMAIL_FROM", user)
+    email_from_name = os.environ.get("EMAIL_FROM_NAME", "MelQuant Labs").strip()
     email_to = os.environ.get("EMAIL_TO", user)
     if not host or not user or not password or not email_from or not email_to:
         print("[error] Email settings are incomplete (check your .env file). "
@@ -194,8 +196,9 @@ def send_email(subject, html_body, inline_images=None):
     else:
         msg = MIMEText(html_body, "html")
     msg["Subject"] = subject
-    msg["From"] = email_from
-    msg["To"] = email_to
+    msg["From"] = formataddr((email_from_name, email_from))
+    msg["Reply-To"] = email_from
+    msg["To"] = "Undisclosed recipients:;"
 
     recipients = [address.strip() for address in email_to.split(",") if address.strip()]
     tls_context = ssl.create_default_context(cafile=certifi.where())
