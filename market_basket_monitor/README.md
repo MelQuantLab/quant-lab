@@ -138,6 +138,17 @@ TICKERS = [
 
 ## Running the monitor
 
+### Mac: one-click daily brief
+
+Double-click `launch_daily_brief.command` to collect current market and news
+data, rebuild the local HTML briefing and Excel dashboard, and open the briefing
+in the default browser. The launcher uses `--dry-run`, so it never sends email
+and does not require email credentials. Its first run creates an isolated Python
+environment; later runs reuse it.
+
+Keep the launcher window open while data is collected. A normal run can take a
+few minutes because it retrieves and validates a broad FTSE data set.
+
 Run a price and alert check:
 
 ```bash
