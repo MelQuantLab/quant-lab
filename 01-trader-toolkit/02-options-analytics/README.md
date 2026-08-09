@@ -42,6 +42,19 @@ The Streamlit interface includes:
 
 ## Run locally
 
+### Mac: one-click launcher
+
+Double-click `launch_dashboard.command`. On first use it creates a private
+Python environment and installs the required packages; after that, it starts the
+dashboard and opens `http://127.0.0.1:8501` in the default browser. Keep the
+small launcher window open while using the app and close it to stop the local
+server. Calculation history remains on the Mac in `data/options_analytics.db`.
+
+If macOS blocks the file after downloading it, Control-click it, choose
+**Open**, then confirm **Open** once. Subsequent launches work normally.
+
+### Terminal setup
+
 From this folder:
 
 ```bash
