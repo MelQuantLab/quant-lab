@@ -1,7 +1,10 @@
 """Independent numerical tests for Black-Scholes options analytics."""
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from database import connect, save_calculation
 from options_analytics import (
     OptionInputs,
     analyse_option,
@@ -9,7 +12,9 @@ from options_analytics import (
     no_arbitrage_bounds,
     option_price,
     put_call_parity_gap,
+    price_pair,
     scenario_analysis,
+    scenario_surface,
 )
 
 
@@ -76,6 +81,67 @@ class ScenarioTests(unittest.TestCase):
         result = scenario_analysis(inputs, [5], [0])[0]
         self.assertGreater(result.value_change, 0)
 
+    def test_pair_pnl_is_model_value_less_purchase_price(self) -> None:
+        result = price_pair(
+            spot=100,
+            strike=100,
+            time_to_expiry=1,
+            risk_free_rate=0.05,
+            volatility=0.20,
+            call_purchase_price=8,
+            put_purchase_price=7,
+        )
+        self.assertAlmostEqual(result.call_pnl, result.call_value - 8)
+        self.assertAlmostEqual(result.put_pnl, result.put_value - 7)
+
+    def test_pair_surface_contains_every_combination(self) -> None:
+        surface = scenario_surface(
+            spot_prices=[90, 100, 110],
+            volatilities=[0.15, 0.20],
+            strike=100,
+            time_to_expiry=1,
+            risk_free_rate=0.05,
+            call_purchase_price=8,
+            put_purchase_price=7,
+        )
+        self.assertEqual(len(surface), 6)
+        self.assertTrue(all(point.call_pnl == point.call_value - 8 for point in surface))
+
+
+class DatabaseTests(unittest.TestCase):
+    def test_run_saves_one_input_with_linked_outputs(self) -> None:
+        surface = scenario_surface(
+            spot_prices=[95, 105],
+            volatilities=[0.15, 0.25],
+            strike=100,
+            time_to_expiry=1,
+            risk_free_rate=0.05,
+            call_purchase_price=8,
+            put_purchase_price=7,
+        )
+        with TemporaryDirectory() as directory:
+            database_path = Path(directory) / "test.db"
+            calculation_id = save_calculation(
+                database_path,
+                stock_price=100,
+                strike_price=100,
+                volatility=0.20,
+                time_to_expiry=1,
+                risk_free_rate=0.05,
+                call_purchase_price=8,
+                put_purchase_price=7,
+                surface=surface,
+            )
+            with connect(database_path) as connection:
+                inputs_count = connection.execute("SELECT COUNT(*) FROM inputs").fetchone()[0]
+                output_rows = connection.execute(
+                    "SELECT * FROM outputs WHERE CalculationId = ?", (calculation_id,)
+                ).fetchall()
+
+        self.assertEqual(inputs_count, 1)
+        self.assertEqual(len(output_rows), 4)
+        self.assertAlmostEqual(output_rows[0]["CallPnL"], output_rows[0]["CallModelValue"] - 8)
+
 
 class ValidationTests(unittest.TestCase):
     def test_invalid_contract_inputs_are_rejected(self) -> None:
@@ -83,6 +149,15 @@ class ValidationTests(unittest.TestCase):
             option_price(OptionInputs("swap", 100, 100, 1, 0.05, 0.20))  # type: ignore[arg-type]
         with self.assertRaises(ValueError):
             option_price(OptionInputs("call", 0, 100, 1, 0.05, 0.20))
+        with self.assertRaises(ValueError):
+            price_pair(
+                spot=100,
+                strike=100,
+                time_to_expiry=1,
+                risk_free_rate=0.05,
+                volatility=0.20,
+                call_purchase_price=-1,
+            )
 
 
 if __name__ == "__main__":

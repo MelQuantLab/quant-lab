@@ -58,8 +58,9 @@ with placeholder projects.
   — a tested risk workstation for execution attribution, position sizing,
   strategy expectancy, Kelly analysis and portfolio risk-limit checks.
 - [Project 2: Black-Scholes Options Analytics](01-trader-toolkit/02-options-analytics/)
-  — European option pricing, Greeks, implied volatility, scenario analysis and
-  put-call parity implemented from first principles.
+  — an interactive Streamlit scenario lab for European call/put fair value,
+  mark-to-model P&L, spot/volatility heatmaps and auditable SQLite run history,
+  backed by first-principles pricing, Greeks and implied-volatility analytics.
 - [Project 3: Credit Relative Value Screener](01-trader-toolkit/03-relative-value-screener/)
   — a PM-style credit workflow combining peer and issuer-curve dislocations,
   rolling z-scores, walk-forward evidence, liquidity/cost filters, risk sizing

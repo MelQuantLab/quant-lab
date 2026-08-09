@@ -63,6 +63,30 @@ class ScenarioResult:
     value_change_percent: float
 
 
+@dataclass(frozen=True)
+class PairedValuation:
+    """Call and put fair values with mark-to-model P&L."""
+
+    call_value: float
+    put_value: float
+    call_purchase_price: float
+    put_purchase_price: float
+    call_pnl: float
+    put_pnl: float
+
+
+@dataclass(frozen=True)
+class SurfacePoint:
+    """One spot/volatility point on a paired call and put scenario surface."""
+
+    shocked_spot: float
+    shocked_volatility: float
+    call_value: float
+    put_value: float
+    call_pnl: float
+    put_pnl: float
+
+
 def normal_cdf(value: float) -> float:
     """Standard normal cumulative distribution function."""
     return 0.5 * (1 + erf(value / sqrt(2)))
@@ -115,6 +139,70 @@ def option_price(inputs: OptionInputs) -> float:
     if inputs.option_type == "call":
         return discounted_spot * normal_cdf(d1) - discounted_strike * normal_cdf(d2)
     return discounted_strike * normal_cdf(-d2) - discounted_spot * normal_cdf(-d1)
+
+
+def price_pair(
+    *,
+    spot: float,
+    strike: float,
+    time_to_expiry: float,
+    risk_free_rate: float,
+    volatility: float,
+    call_purchase_price: float = 0.0,
+    put_purchase_price: float = 0.0,
+) -> PairedValuation:
+    """Value matching European call/put contracts and mark each to purchase price."""
+    if call_purchase_price < 0 or put_purchase_price < 0:
+        raise ValueError("Purchase prices cannot be negative.")
+    common = (spot, strike, time_to_expiry, risk_free_rate, volatility)
+    call_value = option_price(OptionInputs("call", *common))
+    put_value = option_price(OptionInputs("put", *common))
+    return PairedValuation(
+        call_value=call_value,
+        put_value=put_value,
+        call_purchase_price=call_purchase_price,
+        put_purchase_price=put_purchase_price,
+        call_pnl=call_value - call_purchase_price,
+        put_pnl=put_value - put_purchase_price,
+    )
+
+
+def scenario_surface(
+    *,
+    spot_prices: list[float],
+    volatilities: list[float],
+    strike: float,
+    time_to_expiry: float,
+    risk_free_rate: float,
+    call_purchase_price: float,
+    put_purchase_price: float,
+) -> list[SurfacePoint]:
+    """Return paired valuations for every spot/volatility combination."""
+    if not spot_prices or not volatilities:
+        raise ValueError("Scenario axes cannot be empty.")
+    points: list[SurfacePoint] = []
+    for shocked_spot in spot_prices:
+        for shocked_volatility in volatilities:
+            values = price_pair(
+                spot=shocked_spot,
+                strike=strike,
+                time_to_expiry=time_to_expiry,
+                risk_free_rate=risk_free_rate,
+                volatility=shocked_volatility,
+                call_purchase_price=call_purchase_price,
+                put_purchase_price=put_purchase_price,
+            )
+            points.append(
+                SurfacePoint(
+                    shocked_spot=shocked_spot,
+                    shocked_volatility=shocked_volatility,
+                    call_value=values.call_value,
+                    put_value=values.put_value,
+                    call_pnl=values.call_pnl,
+                    put_pnl=values.put_pnl,
+                )
+            )
+    return points
 
 
 def analyse_option(inputs: OptionInputs) -> OptionAnalytics:
