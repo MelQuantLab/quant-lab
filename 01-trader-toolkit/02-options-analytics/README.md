@@ -36,7 +36,9 @@ The Streamlit interface includes:
 - configurable scenario ranges and grid resolution; and
 - a one-click save to a local SQLite database, plus recent-run history.
 
-![MelQuantLabs Black–Scholes P&L scenario dashboard](docs/images/options-scenario-lab.jpg)
+<img src="docs/images/options-scenario-lab.jpg"
+     alt="MelQuantLabs Black–Scholes P&amp;L scenario dashboard"
+     width="100%">
 
 ## Run locally
 

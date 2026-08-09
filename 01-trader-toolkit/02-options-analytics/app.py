@@ -16,15 +16,21 @@ from options_analytics import price_pair, scenario_surface
 APP_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = APP_DIR / "data" / "options_analytics.db"
 
-st.set_page_config(page_title="MelQuantLabs | Options Lab", page_icon="📈", layout="wide")
+st.set_page_config(
+    page_title="MelQuantLabs | Options Lab",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 st.markdown(
     """
     <style>
-    .stApp { background: #07111f; color: #eef4ff; }
-    [data-testid="stSidebar"] { background: #0c1829; }
     [data-testid="stMetric"] {
         background: linear-gradient(145deg, #101f34, #0b1728);
         border: 1px solid #223752; border-radius: 12px; padding: 16px;
+    }
+    [data-testid="stMetricLabel"], [data-testid="stMetricValue"] {
+        color: #eef4ff;
     }
     .eyebrow { color: #42d3b2; font-weight: 700; letter-spacing: .12em; }
     .subtle { color: #9cafc7; }
@@ -66,6 +72,11 @@ def heatmap(frame: pd.DataFrame, value_column: str, title: str, pnl: bool) -> go
         font={"color": "#dce8f8"},
     )
     return figure
+
+
+def money(value: float) -> str:
+    """Format signed currency with the sign before the currency symbol."""
+    return f"-${abs(value):,.2f}" if value < 0 else f"${value:,.2f}"
 
 
 st.markdown('<div class="eyebrow">MELQUANTLABS · OPTIONS ANALYTICS</div>', unsafe_allow_html=True)
@@ -139,10 +150,10 @@ frame = pd.DataFrame(
 )
 
 call_value, put_value, call_pnl, put_pnl = st.columns(4)
-call_value.metric("Call fair value", f"${valuation.call_value:,.2f}")
-put_value.metric("Put fair value", f"${valuation.put_value:,.2f}")
-call_pnl.metric(f"Call P&L vs ${call_purchase_price:,.2f} cost", f"${valuation.call_pnl:,.2f}")
-put_pnl.metric(f"Put P&L vs ${put_purchase_price:,.2f} cost", f"${valuation.put_pnl:,.2f}")
+call_value.metric("Call fair value", money(valuation.call_value))
+put_value.metric("Put fair value", money(valuation.put_value))
+call_pnl.metric(f"Call P&L vs {money(call_purchase_price)} cost", money(valuation.call_pnl))
+put_pnl.metric(f"Put P&L vs {money(put_purchase_price)} cost", money(valuation.put_pnl))
 
 view = st.radio("Heatmap measure", ["Position P&L", "Model value"], horizontal=True)
 left, right = st.columns(2)
