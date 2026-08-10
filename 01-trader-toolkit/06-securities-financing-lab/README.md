@@ -48,7 +48,33 @@ The key learning is that **trade P&L and financing P&L interact**. A correct sto
 5. Use the heatmap to identify the combinations of price movement and borrow cost that make or break the trade.
 6. Challenge the assumptions: ask which values are observable today, which may reprice and which are judgement-based estimates.
 
+## Dashboard preview
+
+The interface uses a dark navy and teal trading-workstation theme. The sidebar
+controls the trade, financing and operational-risk assumptions; the main panel
+shows headline economics, an auditable P&L bridge and an interactive price-move
+versus borrow-fee heatmap.
+
+![Equity Borrow & Financing Scenario Lab dashboard](docs/images/securities-financing-lab.jpg)
+
+The scenario tab makes the interaction between the directional view and the
+cost of borrow immediately visible:
+
+![Borrow-fee and stock-price scenario heatmap](docs/images/securities-financing-heatmap.jpg)
+
 ## Run locally
+
+### Mac: one-click launcher
+
+Double-click `launch_dashboard.command`. On first use, it creates a private
+Python environment and installs the declared packages. It then opens the app at
+`http://127.0.0.1:8501`. Keep the small launcher window open while using the
+dashboard; closing it stops the local app.
+
+If macOS blocks the downloaded launcher, Control-click it, choose **Open**, then
+confirm **Open**. This is normally required only the first time.
+
+### Terminal setup
 
 ```bash
 python -m venv .venv
@@ -109,6 +135,8 @@ These tests validate implementation behaviour, not the economic accuracy of user
 securities-financing-lab/
 ├── app.py                         # Streamlit presentation and interaction
 ├── analytics.py                   # Pure, testable calculation functions
+├── launch_dashboard.command       # One-click Mac launcher
+├── docs/images/                   # Verified dashboard screenshots
 ├── data/sample_inventory.csv      # Fictional learning dataset
 ├── tests/test_analytics.py        # Unit tests for core economic logic
 ├── .streamlit/config.toml         # Dark navy / teal visual theme

@@ -89,15 +89,16 @@ with tab2:
     price_moves = np.arange(-15, 16, 3)
     fees = np.array([0.5, 1, 2, 4, 8, 12, 16])
     grid = scenario_grid(inputs, price_moves, fees)
-    long = grid.rename_axis("Borrow fee").reset_index().melt("Borrow fee", var_name="Stock move", value_name="Net P&L")
+    long = grid.rename_axis("fee_pct").reset_index().melt("fee_pct", var_name="move_pct", value_name="net_pnl")
+    long["move_pct"] = pd.to_numeric(long["move_pct"])
     heat = alt.Chart(long).mark_rect(cornerRadius=2).encode(
-        x=alt.X("Stock move:O", title="Stock price move (%)"), y=alt.Y("Borrow fee:O", title="Borrow fee (%)", sort="descending"),
-        color=alt.Color("Net P&L:Q", scale=alt.Scale(scheme="redblue", domainMid=0)),
-        tooltip=[alt.Tooltip("Stock move:O", title="Move %"), alt.Tooltip("Borrow fee:O", title="Fee %"), alt.Tooltip("Net P&L:Q", format="£,.0f")]
+        x=alt.X("move_pct:O", title="Stock price move (%)"), y=alt.Y("fee_pct:O", title="Borrow fee (%)", sort="descending"),
+        color=alt.Color("net_pnl:Q", title="Net P&L (£)", scale=alt.Scale(scheme="redblue", domainMid=0)),
+        tooltip=[alt.Tooltip("move_pct:O", title="Move %"), alt.Tooltip("fee_pct:O", title="Fee %"), alt.Tooltip("net_pnl:Q", title="Net P&L", format=",.0f")]
     ).properties(height=430)
     text = alt.Chart(long).mark_text(fontSize=11).encode(
-        x="Stock move:O", y=alt.Y("Borrow fee:O", sort="descending"), text=alt.Text("Net P&L:Q", format=".2s"),
-        color=alt.condition("abs(datum['Net P&L']) > 10000", alt.value("white"), alt.value("#dce9ee"))
+        x="move_pct:O", y=alt.Y("fee_pct:O", sort="descending"), text=alt.Text("net_pnl:Q", format=".2s"),
+        color=alt.condition("abs(datum.net_pnl) > 10000", alt.value("white"), alt.value("#dce9ee"))
     )
     st.altair_chart(heat + text, use_container_width=True)
     st.info("Read across to test the stock view; read down to test financing pressure. Red cells lose money, blue cells make money. Hover for exact P&L.")
