@@ -29,7 +29,7 @@ div[data-testid="stDataFrame"] { border:1px solid #17364a; border-radius:12px; o
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""<div class="hero"><div class="eyebrow">MelQuantLab · Interview Project</div>
+st.markdown("""<div class="hero"><div class="eyebrow">MelQuantLab · Research Software</div>
 <h1>Equity Borrow & Financing Scenario Lab</h1>
 <p>Explore whether a short trade still makes economic sense after stock-borrow fees, collateral rebate, execution costs and recall risk. Built to make the mechanics visible—not to predict markets.</p>
 <span class="chip">ACT/360</span><span class="chip">Auditable maths</span><span class="chip">Scenario analysis</span></div>""", unsafe_allow_html=True)

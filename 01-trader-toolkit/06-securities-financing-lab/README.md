@@ -6,7 +6,7 @@ Expressing a short view involves more than predicting where a share price will m
 
 The lab tests a practical trading-desk question: **after borrow fees, collateral rebate, execution costs and recall risk, is the trade still worth putting on?** Users can adjust the market and financing assumptions, inspect each component of expected P&L, and stress the trade across different stock-price moves and borrow-fee environments.
 
-Built as a hands-on learning project for securities financing and equity finance trading opportunities, it demonstrates the ability to translate desk concepts into transparent calculations, interactive risk analysis and commercially relevant trading questions—while remaining accessible enough to explain confidently in an interview.
+Built as a hands-on research and learning project, it translates securities-financing concepts into transparent calculations, interactive risk analysis and commercially relevant trading questions.
 
 > **Project status:** Pre-release research software. The deterministic scenario engine and interface are working and tested; stochastic modelling and dynamic borrow-fee behaviour are documented future extensions, not current features.
 
@@ -232,15 +232,6 @@ securities-financing-lab/
 
 Keeping calculations outside the UI makes them easier to audit, test and reuse. `TradeInputs` provides one explicit contract for all assumptions.
 
-## Interview talking points
-
-1. **Start with purpose:** “I built this to connect a directional equity view to the cost and availability of financing the position.”
-2. **Walk the economics:** Explain price P&L first, then add rebate, borrow fee, execution and expected recall cost one line at a time.
-3. **Use the heatmap:** Show that a trade is a range of outcomes, not one point estimate. Explain the interaction between an adverse stock move and a widening borrow fee.
-4. **Discuss operational reality:** A locate is not the same as a guaranteed term borrow. Utilization is a crowding signal, and lender concentration or recalls can matter even when today's fee looks manageable.
-5. **Show control thinking:** Calculations are pure functions, assumptions are visible, sample names are fictional, and tests cover directionality, fee sensitivity, ACT/360 and locate shortfall.
-6. **Acknowledge limits:** Explain what would be needed before using the model for real risk or trading decisions.
-
 ## Learning outcomes
 
 - How equity borrow fees and cash-collateral rebates feed into short economics.
@@ -259,7 +250,7 @@ Keeping calculations outside the UI makes them easier to audit, test and reuse. 
 - Add dividends/manufactured payments, collateral haircuts and margin funding.
 - Simulate recalls with Monte Carlo paths and compare expected shortfall, not just expected cost.
 - Add portfolio aggregation, issuer/sector concentrations and lender diversification.
-- Persist named scenarios and export an interview-ready scenario report.
+- Persist named scenarios and export a reusable scenario report.
 - Add data validation and a formal calculation-methodology document.
 
 ## Authorship, attribution and citation
