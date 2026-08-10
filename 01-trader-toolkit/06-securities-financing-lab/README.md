@@ -39,6 +39,53 @@ A directional short view is only one leg of the decision. Stock can become expen
 
 The key learning is that **trade P&L and financing P&L interact**. A correct stock call can still disappoint when borrow is tight, the holding period is long, or recall risk is costly.
 
+## How the trade economics connect
+
+```mermaid
+flowchart LR
+    A["Short-sale notional<br/>shares × start price"] --> B["Directional price P&L"]
+    C["Collateral balance<br/>× rebate × ACT/360"] --> D["Rebate income"]
+    E["Borrowed stock<br/>× fee × ACT/360"] --> F["Borrow cost"]
+    G["Recall probability<br/>× cover-cost severity"] --> H["Expected recall cost"]
+    I["Entry and exit<br/>transaction costs"] --> J["Execution cost"]
+
+    B --> K["Net expected P&L"]
+    D --> K
+    F -->|"subtract"| K
+    H -->|"subtract"| K
+    J -->|"subtract"| K
+
+    K --> L["Borrow-adjusted<br/>break-even decline"]
+    K --> M["Scenario heatmap"]
+    K --> N["Trade discussion<br/>and risk challenge"]
+```
+
+This bridge makes the model auditable: every positive and negative contribution
+to expected P&L can be inspected independently before it reaches the headline
+result.
+
+## Crowded-borrow stress chain
+
+```mermaid
+flowchart TD
+    A["Short demand increases"] --> B["Utilization rises"]
+    B --> C["Locate headroom falls"]
+    B --> D["Borrow fee may widen"]
+    B --> E["Recall risk may increase"]
+    C --> F["Position may need resizing"]
+    D --> G["Financing drag increases"]
+    E --> H["Replacement or close-out<br/>may become more expensive"]
+    F --> I["Lower implementable exposure"]
+    G --> J["Higher break-even stock decline"]
+    H --> J
+    I --> K["Reassess whether the<br/>risk/reward still works"]
+    J --> K
+```
+
+The arrows describe a stress narrative rather than a guaranteed causal law.
+The current app lets the user challenge the individual assumptions; a future
+dynamic model could estimate how they evolve together.
+
 ## A 60-second walkthrough
 
 1. Choose a fictional security and enter the proposed position size.
@@ -130,6 +177,44 @@ The calculation engine is separated from the Streamlit interface. Its automated 
 These tests validate implementation behaviour, not the economic accuracy of user-entered assumptions.
 
 ## Architecture
+
+```mermaid
+flowchart LR
+    subgraph UI["Streamlit interface"]
+        A["Trade controls"]
+        B["Financing controls"]
+        C["Operational-risk controls"]
+    end
+
+    subgraph ENGINE["Auditable analytics engine"]
+        D["TradeInputs contract"]
+        E["P&L component calculations"]
+        F["Availability and risk labels"]
+        G["Scenario-grid generator"]
+    end
+
+    subgraph OUTPUTS["Decision outputs"]
+        H["Headline metrics"]
+        I["Economics table"]
+        J["P&L path"]
+        K["Price / fee heatmap"]
+        L["Plain-English interpretation"]
+    end
+
+    A --> D
+    B --> D
+    C --> D
+    D --> E
+    D --> F
+    D --> G
+    E --> H
+    E --> I
+    E --> J
+    F --> H
+    G --> K
+    E --> L
+    F --> L
+```
 
 ```text
 securities-financing-lab/
