@@ -1,0 +1,6 @@
+ticker,sector,price_gbp,borrow_fee_pct,rebate_rate_pct,utilization_pct,locate_available,recall_probability_pct
+NOVA,Technology,42.50,3.25,1.50,78,18000,8
+APEX,Industrials,118.00,0.65,1.75,42,50000,2
+ORBIT,Consumer,16.80,12.00,-1.00,94,7000,22
+LUMEN,Healthcare,73.20,1.10,1.60,55,32000,4
+VANTA,Energy,28.40,6.75,0.25,87,12500,14

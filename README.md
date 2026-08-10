@@ -36,7 +36,8 @@ quant-lab/
 │   ├── 02-options-analytics/
 │   ├── 03-relative-value-screener/
 │   ├── 04-market-maker-simulator/
-│   └── 05-bond-analytics/
+│   ├── 05-bond-analytics/
+│   └── 06-securities-financing-lab/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
@@ -71,21 +72,26 @@ with placeholder projects.
 - [Project 5: Bond Pricing, Yield & Duration](01-trader-toolkit/05-bond-analytics/)
   — fixed-rate bond valuation, YTM solving, duration, convexity, DV01 and
   exact interest-rate shock scenarios.
+- [Project 6: Equity Borrow & Financing Scenario Lab](01-trader-toolkit/06-securities-financing-lab/)
+  — an interactive securities-financing workstation connecting short-sale P&L
+  with borrow fees, collateral rebate, locate coverage, utilization, recall
+  risk and joint price/fee scenario analysis.
 
-### Ten-tool target
+### Trader Toolkit target
 
-The Trader Toolkit is being developed as a defined ten-project collection:
+The Trader Toolkit is being developed as a defined collection:
 
 1. Trade & Risk Analytics Calculator — complete
 2. Black-Scholes Options Analytics — complete
 3. Credit Relative Value Screener — complete
 4. Market Maker Simulator — complete
 5. Bond Pricing, Yield & Duration — complete
-6. Value-at-Risk & Stress Testing — planned
-7. Pairs Trading & Cointegration — planned
-8. Order Book & Liquidity Analyzer — planned
-9. Portfolio Optimizer — planned
-10. Yield Curve & Forward Rate Analyzer — planned
+6. Equity Borrow & Financing Scenario Lab — complete
+7. Value-at-Risk & Stress Testing — planned
+8. Pairs Trading & Cointegration — planned
+9. Order Book & Liquidity Analyzer — planned
+10. Portfolio Optimizer — planned
+11. Yield Curve & Forward Rate Analyzer — planned
 
 ### 02 — Financial Data
 
