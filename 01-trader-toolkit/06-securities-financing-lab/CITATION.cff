@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "Equity Borrow & Financing Scenario Lab"
+abstract: >-
+  An interactive and auditable securities-financing scenario lab connecting
+  equity short-sale P&L with borrow fees, collateral rebate, locate coverage,
+  utilization, recall risk, transaction costs and joint price/fee sensitivity.
+authors:
+  - family-names: "Nimota"
+    given-names: "Mel"
+    orcid: "https://orcid.org/0009-0009-3338-223X"
+version: 1.0.0
+date-released: 2026-08-10
+license: MIT
+repository-code: "https://github.com/MelQuantLab/quant-lab/tree/main/01-trader-toolkit/06-securities-financing-lab"
+url: "https://github.com/MelQuantLab/quant-lab/tree/main/01-trader-toolkit/06-securities-financing-lab"
+keywords:
+  - securities financing
+  - equity borrow
+  - securities lending
+  - short selling
+  - borrow fee
+  - collateral rebate
+  - locate availability
+  - recall risk
+  - scenario analysis
+  - financial software

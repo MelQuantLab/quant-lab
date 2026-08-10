@@ -266,9 +266,15 @@ Keeping calculations outside the UI makes them easier to audit, test and reuse. 
 
 This project is an original software implementation of established securities-financing concepts and standard financial arithmetic. It does not claim invention of the underlying market conventions, scenario-analysis techniques or any future Monte Carlo methods. External methods added in later versions will be cited in the methodology and release metadata.
 
-Associated ORCID: [0009-0009-3338-223X](https://orcid.org/0009-0009-3338-223X)
+- Author: **Mel Nimota**
+- ORCID: [0009-0009-3338-223X](https://orcid.org/0009-0009-3338-223X)
 
-Before the first public release, the repository will include a `CITATION.cff` file, an open-source licence and versioned release metadata. The archived release DOI—not an evolving branch—should be used for formal citation.
+Contributor roles: **Conceptualization, Software, Methodology, Formal analysis,
+Validation, Visualization, and Writing – original draft.**
+
+The repository includes machine-readable citation metadata, an MIT licence and
+versioned release notes. Once the release is archived, the version DOI—not an
+evolving branch—should be used for formal citation.
 
 ## Disclaimer
 
