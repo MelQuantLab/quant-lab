@@ -75,12 +75,12 @@ with tab1:
             color=alt.Color("Series:N", scale=alt.Scale(domain=["Net expected P&L", "Price P&L"], range=["#2dd4bf", "#6b86a0"])),
             tooltip=["Day:Q", "Series:N", alt.Tooltip("P&L:Q", format=",.0f")]
         ).properties(height=360)
-        st.altair_chart(chart, use_container_width=True)
+        st.altair_chart(chart, width="stretch")
         st.caption("Illustrative linear price path. The final economics are unchanged; this chart shows how carry accumulates.")
     with right:
         st.subheader("Economics, line by line")
         table = economics_table(inputs).copy()
-        st.dataframe(table, hide_index=True, use_container_width=True,
+        st.dataframe(table, hide_index=True, width="stretch",
             column_config={"P&L": st.column_config.NumberColumn(format="£ %.2f")})
     st.markdown(f"""<div class="explain"><b>Plain-English read:</b> Borrowing {shares:,} {ticker} shares creates £{r['notional']:,.0f} of exposure. If the stock moves {move:+.1f}%, the short's price P&L is £{r['price_pnl']:,.0f}. Financing and risk adjustments change that to <b>£{r['net_pnl']:,.0f}</b>. A negative stock move helps the short; a positive move hurts it.</div>""", unsafe_allow_html=True)
 
@@ -100,7 +100,7 @@ with tab2:
         x="move_pct:O", y=alt.Y("fee_pct:O", sort="descending"), text=alt.Text("net_pnl:Q", format=".2s"),
         color=alt.condition("abs(datum.net_pnl) > 10000", alt.value("white"), alt.value("#dce9ee"))
     )
-    st.altair_chart(heat + text, use_container_width=True)
+    st.altair_chart(heat + text, width="stretch")
     st.info("Read across to test the stock view; read down to test financing pressure. Red cells lose money, blue cells make money. Hover for exact P&L.")
 
 with tab3:
