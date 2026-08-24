@@ -74,6 +74,34 @@ def estimated_net_return_pct(event: Mapping[str, float | str], holding_days: int
     return round(gross - borrow_cost - execution_cost, 2)
 
 
+def incremental_lending_revenue(
+    market_value: float,
+    current_fee_pct: float,
+    improved_fee_pct: float,
+    days_on_loan: int,
+    revenue_share_pct: float = 100.0,
+) -> dict[str, float]:
+    """Estimate the gross and retained benefit of repricing lendable inventory.
+
+    Fees are annualised and calculated on a simple ACT/365 basis. The result is
+    an attribution aid, not an invoice or accounting valuation.
+    """
+
+    if market_value < 0 or days_on_loan < 0:
+        raise ValueError("Market value and days on loan must be non-negative.")
+    if not 0 <= revenue_share_pct <= 100:
+        raise ValueError("Revenue share must be between 0 and 100 percent.")
+
+    fee_improvement_pct = improved_fee_pct - current_fee_pct
+    gross = market_value * (fee_improvement_pct / 100.0) * days_on_loan / 365.0
+    retained = gross * revenue_share_pct / 100.0
+    return {
+        "fee_improvement_pct": round(fee_improvement_pct, 4),
+        "gross_incremental_revenue": round(gross, 2),
+        "retained_incremental_revenue": round(retained, 2),
+    }
+
+
 def assess_event(event: Mapping[str, float | str], holding_days: int = 7) -> EventAssessment:
     pressure = borrow_pressure_score(event)
     net_return = estimated_net_return_pct(event, holding_days)

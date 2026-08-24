@@ -7,6 +7,7 @@ from analytics import (
     earnings_signal,
     enrich_events,
     filter_horizon,
+    incremental_lending_revenue,
     scenario_grid,
 )
 
@@ -82,3 +83,13 @@ def test_daily_brief_contains_controls_and_ticker():
     assert "TEST" in brief
     assert "CONTROL CHECKS" in brief
     assert "not an execution instruction" in brief
+
+
+def test_incremental_lending_revenue_matches_act_365_example():
+    result = incremental_lending_revenue(10_000_000, 2.0, 7.0, 30)
+    assert result["gross_incremental_revenue"] == 41095.89
+
+
+def test_incremental_lending_revenue_applies_revenue_share():
+    result = incremental_lending_revenue(10_000_000, 2.0, 7.0, 30, 80.0)
+    assert result["retained_incremental_revenue"] == 32876.71

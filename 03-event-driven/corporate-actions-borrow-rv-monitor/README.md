@@ -1,66 +1,243 @@
 # Corporate Actions, Borrow & Relative-Value Monitor
 
-> A risk-first decision lab for turning earnings and UK corporate events into prioritised inventory reviews, borrow-aware scenarios and auditable relative-value research candidates.
+### From public disclosures to risk-controlled trading and securities-finance decisions
 
-## Purpose
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-interactive%20app-FF4B4B?logo=streamlit&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-11%20passing-06D6A0)
+![Status](https://img.shields.io/badge/status-working%20prototype-00C2B8)
 
-The project translates a practical desk problem into a repeatable workflow: announcements arrive quickly, but the consequences for price, peer relationships, hedging demand, lendable supply and recall risk are rarely visible in one place. The monitor connects four questions normally reviewed separately:
+> **Desk question:** Which newly announced event could change an equity's price, borrow demand, lendable supply, financing economics or settlement risk—and what should the desk review first?
 
-1. What did the company announce?
-2. How could it affect equity price and peer relationships?
-3. How could it change short demand, lendable supply or recall risk?
-4. Does the opportunity remain attractive after costs and stressed downside?
+This is a working, risk-first research application for UK and European corporate actions, earnings and securities-finance signals. It converts a noisy announcement queue into prioritised inventory reviews, borrow-aware scenarios and auditable relative-value candidates over **seven-day** and **one-month** horizons.
 
-The included sample covers:
+The goal is not to rank the most dramatic headline. It is to identify the opportunity with the clearest catalyst, strongest net economics, most dependable borrow and most acceptable downside.
 
-- Earnings, trading updates and guidance changes
-- Equity placings and rights issues
-- Takeovers and mergers
-- FTSE index additions and deletions
+---
 
-The architecture also anticipates dividends and capital returns, restructurings, regulatory events, tender offers, demergers, lock-up expiries and other supply-changing events. **Earnings remain a permanent part of the monitor**, not an optional extension.
+## Why this tool exists
 
-It produces two deliberately separate outputs:
+Corporate actions are rarely “just events.” A placing can expand lendable supply while pressuring price. An index deletion can create directional flow, hedging demand and temporary borrow pressure. A takeover can alter recall risk, settlement requirements and spread economics. Earnings can reprice both an issuer and its peer group within seconds.
 
-- **Borrow-pressure alerts:** where inventory, term or pricing may deserve review.
-- **Relative-value research candidates:** where an event may create an actionable dislocation after estimated costs.
+The monitor joins five questions that are often reviewed separately:
 
-## Workflow
+| Desk question | Output |
+|---|---|
+| What happened? | Normalised event type, terms, dates and source fields |
+| What could move? | Directional, peer-relative and supply/demand hypotheses |
+| What happens to borrow? | Fee, availability, utilization, concentration and recall review |
+| Is the trade still economic? | Gross view less borrow and execution costs |
+| What can go wrong? | Stress loss, liquidity constraint and rejection reason |
+
+### Commercial uses
+
+| Trading | Securities finance | Risk and operations |
+|---|---|---|
+| Event-driven research | Inventory planning | Event and timetable control |
+| Pair-trade screening | Locate prioritisation | Settlement-risk review |
+| 7-day and 1-month watchlists | Fee-pressure monitoring | Manual-review queue |
+| Scenario and break-even analysis | Recall-risk flags | Data lineage and audit trail |
+
+---
+
+## Announcement-to-decision workflow
 
 ```mermaid
 flowchart LR
-    A[Announcement] --> B[Validate terms]
-    B --> C[Assess price and borrow effects]
-    C --> D[Calculate economics]
-    D --> E{Risk gates}
-    E -->|Pass| F[Watchlist]
-    E -->|Unclear| G[Manual review]
-    E -->|Fail| H[Reject]
-    F --> I[7-day and 1-month outcomes]
-    G --> I
-    H --> I
+    A[Announcement or earnings release] --> B[Validate timestamp, issuer and terms]
+    B --> C[Classify event and sector]
+    C --> D[Assess price and peer impact]
+    C --> E[Assess borrow demand and supply]
+    D --> F[Calculate net economics]
+    E --> F
+    F --> G{Risk gateway}
+    G -->|Pass| H[Approved watchlist]
+    G -->|Unclear| I[Manual review]
+    G -->|Fail| J[Reject]
+    H --> K[7-day and 1-month outcomes]
+    I --> K
+    J --> K
+
+    style A fill:#071E33,color:#FFFFFF,stroke:#00C2B8,stroke-width:3px
+    style F fill:#D4A72C,color:#071E33
+    style G fill:#F4A261,color:#071E33
+    style H fill:#06D6A0,color:#071E33
+    style I fill:#FFD166,color:#071E33
+    style J fill:#EF476F,color:#FFFFFF
 ```
 
-### Decision architecture
+The workflow deliberately separates two outputs:
+
+- **Borrow-pressure alerts** identify names where inventory, term, pricing or recall exposure deserves review.
+- **Relative-value research candidates** identify dislocations that may remain attractive after estimated costs and risk gates.
+
+A high score means **review sooner**. It is not an instruction to short the stock.
+
+---
+
+## What the working application does
+
+The Streamlit interface contains seven connected views:
+
+1. **Morning monitor** — prioritised events, inventory actions and decision mix.
+2. **Heatmaps** — event concentration and average borrow pressure by sector and event family.
+3. **Event drilldown** — transparent score inputs, economics and rejection reasons.
+4. **Earnings lab** — earnings surprise, guidance change, issuer reaction and peer-relative move.
+5. **Relative-value scenarios** — net P&L across spread outcomes and borrow-fee assumptions.
+6. **Daily email draft** — a review-ready briefing for validation before circulation.
+7. **Methodology** — formulas, assumptions, limitations and data status.
+
+### Dashboard concept
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ CORPORATE ACTIONS, BORROW & RV MONITOR                07:15 London │
+├──────────────────────┬─────────────────────┬────────────────────────┤
+│ EVENT QUEUE          │ BORROW WATCH        │ RISK ALERTS            │
+│ New announcements    │ Tightening names    │ Manual reviews         │
+│ High-priority events │ Potential specials  │ Approaching elections  │
+├──────────────────────┴─────────────────────┴────────────────────────┤
+│ PRIORITISED OPPORTUNITIES                                           │
+│ LONG       SHORT      EVENT       7D    1M    BORROW     DECISION   │
+│ Company A  Company B  Buyback     +     +     Stable     WATCH      │
+│ Company C  Company D  Placing     +     0     Tightening REVIEW     │
+│ Company E  Company F  Takeover    +     +     Expensive  REJECT     │
+├─────────────────────────────────────────────────────────────────────┤
+│ SELECTED IDEA                                                       │
+│ Thesis │ Hedge ratio │ Net P&L │ Stress loss │ Catalyst │ Risks     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Event coverage
+
+**Earnings are a permanent part of the monitor—not an optional extension.**
+
+| Event family | Illustrative implications |
+|---|---|
+| Earnings, trading update or profit warning | Gap risk, peer repricing, short-demand change |
+| Rights issue or placing | Dilution, new supply, hedging and settlement demand |
+| Cash acquisition or share merger | Spread risk, elections, recalls and conversion terms |
+| Buyback, tender or special dividend | Float reduction, lender recall and dividend obligation |
+| Spin-off, demerger or restructuring | New securities, allocation terms and settlement complexity |
+| FTSE inclusion or deletion | Passive flow, liquidity shift and temporary dislocation |
+| Convertible issuance | Delta hedging and potential borrow demand |
+| AGM or shareholder vote | Catalyst timing and outcome uncertainty |
+| Delisting or insolvency event | Exit liquidity, settlement and closeout risk |
+
+---
+
+## Relative-value research
+
+The first version prioritises economic explanation over model complexity. Each candidate must explain **why** a relationship may move rather than merely report a correlation.
 
 ```mermaid
-flowchart TB
-    S[Issuer / regulatory announcement] --> V[Timestamp, identifier and term validation]
-    V --> T[Event taxonomy]
-    T --> P[Price and peer impact]
-    T --> B[Borrow demand and supply impact]
-    P --> C[Costs and scenario economics]
-    B --> C
-    C --> R[Liquidity, locate, crowding and gap-risk gates]
-    R --> O1[7-day watchlist]
-    R --> O2[1-month watchlist]
-    R --> O3[Manual review or reject]
-    O1 --> A[Outcome and audit record]
-    O2 --> A
-    O3 --> A
+flowchart LR
+    CA[Corporate-action intelligence] --> PT[Sector and peer<br/>pair trading]
+    CA --> MA[Merger<br/>arbitrage]
+    CA --> IR[Index-event<br/>relative value]
+    CA --> RP[Rights and placing<br/>dislocations]
+    CA --> BF[Borrow-fee<br/>monitoring]
+    CA --> IO[Inventory<br/>optimisation]
+
+    style CA fill:#071E33,color:#FFFFFF,stroke:#00C2B8,stroke-width:3px
+    style PT fill:#087F8C,color:#FFFFFF
+    style MA fill:#118AB2,color:#FFFFFF
+    style IR fill:#315B7D,color:#FFFFFF
+    style RP fill:#8E5EA2,color:#FFFFFF
+    style BF fill:#E76F51,color:#FFFFFF
+    style IO fill:#06D6A0,color:#071E33
 ```
 
-### Data-source modes
+```text
+LONG / SHORT  →  event thesis  →  expected convergence or divergence
+               →  7-day view  →  1-month view
+               →  borrow and cost adjustment
+               →  risk gates  →  watch / review / reject
+```
+
+Peer selection should ultimately require sector and business similarity, a stable historical relationship, a defensible hedge ratio, sufficient liquidity, available borrow and no conflicting event in the hedge security.
+
+---
+
+## Borrow-adjusted economics
+
+The core decision metric is net expected P&L, not raw spread return.
+
+```text
+Expected net P&L
+= Expected long P&L
++ Expected short P&L
+− Borrow fees
+− Financing costs
+− Execution costs
+− Dividend obligations
+− Expected recall and closeout costs
+```
+
+The prototype implements transparent directional/spread economics, borrow fees and execution costs. Financing, dividend obligations and probabilistic recall/closeout costs are documented extensions requiring suitable data.
+
+| Scenario | Price relationship | Borrow fee | Availability | Desk response |
+|---|---:|---:|---:|---|
+| Base | Expected convergence | Current | Stable | Evaluate |
+| Borrow stress | Unchanged | Higher | Reduced | Recalculate |
+| Failed catalyst | Adverse divergence | Higher | Reduced | Apply risk limit |
+| Recall | Forced or accelerated exit | Accrued | Unavailable | Closeout review |
+| Best case | Faster convergence | Stable | Stable | Take-profit review |
+
+---
+
+## Risk gateway
+
+No tool can guarantee that a trade will not lose money. The application instead requires every candidate to show how it could lose money and why it should be rejected.
+
+```mermaid
+flowchart TD
+    A[Candidate generated] --> B{Borrow confirmed?}
+    B -->|No| X[REJECT]
+    B -->|Yes| C{Net return clears hurdle?}
+    C -->|No| X
+    C -->|Yes| D{Liquidity acceptable?}
+    D -->|No| X
+    D -->|Yes| E{Stressed loss within limit?}
+    E -->|No| X
+    E -->|Yes| F{Data quality sufficient?}
+    F -->|No| R[MANUAL REVIEW]
+    F -->|Yes| G[APPROVED WATCHLIST]
+
+    style B fill:#F4A261,color:#071E33
+    style C fill:#F4A261,color:#071E33
+    style D fill:#F4A261,color:#071E33
+    style E fill:#F4A261,color:#071E33
+    style F fill:#F4A261,color:#071E33
+    style X fill:#EF476F,color:#FFFFFF
+    style R fill:#FFD166,color:#071E33
+    style G fill:#06D6A0,color:#071E33
+```
+
+The working prototype exposes expected and stressed economics, borrow-fee sensitivity, locate availability, utilization, lender concentration, recall-risk category, liquidity, catalyst horizon, data freshness and reasons not to trade. Position sizing, controlled overrides and approval history belong to a later desk-integration phase.
+
+---
+
+## Transparent prototype methodology
+
+The borrow-pressure indicator combines:
+
+- Event-type research prior
+- Utilization
+- Lender concentration
+- Availability scarcity
+- Current fee signal
+- A capped issuance effect
+
+These coefficients are illustrative research priors, not fitted predictions. Every implemented calculation is contained in `analytics.py` and covered by unit tests.
+
+Net expected return deducts simple estimated borrow and execution costs from the gross spread view. The scenario heatmap then shows whether a candidate remains economic when both the spread outcome and borrow fee change.
+
+---
+
+## Data-source modes
 
 ```mermaid
 flowchart LR
@@ -80,73 +257,47 @@ flowchart LR
     R3 --> N
     N --> E[Transparent analytics]
     E --> UI[Streamlit monitor]
-    E --> X[Excel / CSV export]
+    E --> X[Excel or CSV output]
     E --> M[Review-ready email draft]
 ```
 
-## Application views
+### Source hierarchy
 
-- **Morning monitor:** prioritised event queue, inventory actions and decision mix.
-- **Heatmaps:** event concentration and average borrow pressure by sector and event family.
-- **Event drilldown:** transparent borrow-pressure inputs, trade economics and rejection reason.
-- **Earnings lab:** earnings surprise, guidance change, stock reaction and peer-relative move.
-- **Relative-value scenarios:** heatmap of net P&L across borrow-fee and spread outcomes.
-- **Daily email draft:** a downloadable briefing produced for human validation before circulation.
-- **Methodology:** formula disclosure, limitations and research status.
+| Priority | Source type | Intended use |
+|---:|---|---|
+| 1 | Regulatory Information Service / RNS | Timely announcement detection |
+| 2 | Exchange corporate-action data | Structured terms and timetables |
+| 3 | FCA National Storage Mechanism | Official archive and validation |
+| 4 | Issuer circulars and prospectuses | Detailed event terms |
+| 5 | Licensed market data | Prices, volumes, indices and identifiers |
+| 6 | Licensed or internal stock-loan data | Fees, availability, utilization and recalls |
+| 7 | Public discovery services | Prototype discovery only, subject to terms |
 
-## Risk philosophy
+> **Data principle:** A publicly visible webpage is not automatically suitable for bulk collection, redistribution or production trading. Licensing, terms of use, latency, coverage and completeness must be reviewed before implementation.
 
-No tool can guarantee that a trade will not lose money. This project instead requires every candidate to explain how it could lose money.
+All companies, announcements and borrow observations shipped with this repository are illustrative. They demonstrate workflow without representing current recommendations or executable availability.
 
-A candidate may be rejected because:
+### Data-quality controls
 
-- Event terms are not sufficiently reliable.
-- Locate availability is inadequate.
-- Expected return fails to cover estimated costs.
-- Liquidity is insufficient.
-- Stressed loss exceeds the permitted research threshold.
-- The reward is too small relative to the downside.
+| Risk | Required control |
+|---|---|
+| Duplicate, corrected or withdrawn announcements | Preserve source, timestamp and version; route material amendments for review |
+| Look-ahead bias | Use only information available at the decision timestamp |
+| Identifier changes | Maintain dated ticker, LEI, ISIN and SEDOL mappings |
+| Survivorship bias | Retain delisted, acquired and failed issuers in historical tests |
+| Stale prices, fees or locates | Display observation time and reject stale inputs |
+| Ambiguous event terms | Route to manual review instead of inferring missing economics |
+| Public borrow proxies | Label clearly and never present as executable inventory |
 
-## Transparent prototype methodology
+---
 
-The borrow-pressure indicator combines:
-
-- Event-type research prior
-- Utilization
-- Lender concentration
-- Availability scarcity
-- Current fee signal
-- A capped issuance effect
-
-These coefficients are illustrative research priors, not fitted predictions. They must be validated using point-in-time institutional securities-finance data before any production use.
-
-Net expected return deducts simple estimated borrow and execution costs from the gross spread view. Every calculation is contained in `analytics.py` and covered by unit tests.
-
-### Candidate triage
-
-```mermaid
-flowchart LR
-    A[Event confidence] --> S[Borrow-pressure score]
-    B[Utilisation / scarcity] --> S
-    C[Fee / concentration] --> S
-    S --> G{Research gates}
-    D[Expected spread return] --> G
-    E[Execution and borrow cost] --> G
-    F[Stress loss / liquidity] --> G
-    G -->|Clear| W[Watchlist]
-    G -->|Ambiguous| M[Manual review]
-    G -->|Fails| R[Reject]
-```
-
-The score is a prioritisation aid rather than a prediction. A high score means “review inventory and economics sooner”; it does not mean “short the stock.”
-
-## Daily briefing workflow
+## Daily briefing design
 
 ```mermaid
 sequenceDiagram
     participant Feed as Approved data sources
     participant Lab as Monitor
-    participant Analyst as Analyst / trader
+    participant Analyst as Analyst or trader
     participant Mail as Approved mail client
     Feed->>Lab: Events, prices and permitted borrow fields
     Lab->>Lab: Validate, classify, score and risk-gate
@@ -155,7 +306,74 @@ sequenceDiagram
     Analyst->>Mail: Approve, edit or discard
 ```
 
-The application never sends an email. It creates a plain-text draft that makes source validation and human approval explicit. In an authorised institutional environment, the same template could be populated with licensed event data and approved internal inventory fields. The portfolio version uses sample/proxy borrow observations and public or permitted sources.
+The application does **not** send email. It generates a plain-text draft that requires human validation. In a Bloomberg-enabled desk environment, the same workflow could consume licensed announcement, reference-data and securities-finance feeds through approved interfaces. In a standard enterprise environment, it could use permitted issuer/RNS feeds and hand a reviewed draft to an approved mail client. Recipient selection, release and audit controls must remain within the institution's authorised infrastructure.
+
+---
+
+## Architecture: working prototype and desk roadmap
+
+```mermaid
+flowchart LR
+    S[Sample or approved event data] --> P[Python analytics]
+    P --> UI[Streamlit dashboard]
+    P --> T[Unit tests]
+    P --> C[CSV and text output]
+
+    L[Licensed future feeds] -.-> Q[(SQL event store)]
+    Q -.-> P2[Production Python engine]
+    P2 -.-> X[Controlled Excel interface]
+    X -.-> V[VBA refresh and export controls]
+
+    style S fill:#0B5563,color:#FFFFFF
+    style P fill:#D4A72C,color:#071E33
+    style UI fill:#06D6A0,color:#071E33
+    style T fill:#315B7D,color:#FFFFFF
+    style C fill:#118AB2,color:#FFFFFF
+    style L fill:#8E5EA2,color:#FFFFFF
+    style Q fill:#315B7D,color:#FFFFFF
+    style P2 fill:#06D6A0,color:#071E33
+    style X fill:#217346,color:#FFFFFF
+    style V fill:#E67E22,color:#FFFFFF
+```
+
+**Implemented now:** Python analytics, Streamlit interface, sample data, downloadable outputs and unit tests.
+
+**Planned institutional extension:** SQL lineage store, licensed feeds, controlled Excel view and narrow VBA automation. Core calculations should remain visible and testable in Python; VBA should automate approved workflow steps rather than conceal analytics.
+
+---
+
+## Backtest design
+
+A defensible event study must reproduce what could actually have been known and traded at the time.
+
+```mermaid
+flowchart LR
+    T0[Announcement timestamp] --> T1[Information available<br/>at decision time]
+    T1 --> T2[Realistic processing<br/>and trading delay]
+    T2 --> T3[Point-in-time peer<br/>and hedge selection]
+    T3 --> T4[Execution and<br/>borrow constraints]
+    T4 --> T5[7-day outcome]
+    T4 --> T6[1-month outcome]
+    T5 --> V[Validation and attribution]
+    T6 --> V
+
+    style T0 fill:#071E33,color:#FFFFFF
+    style T1 fill:#0B5563,color:#FFFFFF
+    style T2 fill:#087F8C,color:#FFFFFF
+    style T3 fill:#118AB2,color:#FFFFFF
+    style T4 fill:#F4A261,color:#071E33
+    style T5 fill:#06D6A0,color:#071E33
+    style T6 fill:#06D6A0,color:#071E33
+    style V fill:#315B7D,color:#FFFFFF
+```
+
+Controls must include point-in-time constituents, delisted names, realistic delay, spreads, commissions, market impact, borrow fees, dividend obligations, financing, locate availability, recall stress and announcement corrections.
+
+Reporting should include average and median return, hit rate, Sharpe and Sortino ratios, maximum drawdown, expected shortfall, turnover, cost-to-gross-alpha ratio, sector/event/liquidity attribution, long and short contribution, pre/post-borrow performance, stressed fees, rejection rate and results excluding the five strongest trades.
+
+The repository does not yet claim a validated historical strategy. The current sample demonstrates the workflow and calculations; the point-in-time event dataset and full backtest remain future research.
+
+---
 
 ## Run locally
 
@@ -166,7 +384,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-On macOS, you can also double-click `launch_dashboard.command` after making it executable once:
+On macOS, `launch_dashboard.command` provides a double-click launcher after it has been made executable once:
 
 ```bash
 chmod +x launch_dashboard.command
@@ -177,8 +395,6 @@ Run the tests:
 ```bash
 pytest
 ```
-
-## Repository structure
 
 ```text
 corporate-actions-borrow-rv-monitor/
@@ -194,40 +410,50 @@ corporate-actions-borrow-rv-monitor/
 └── README.md
 ```
 
-## Data status
+---
 
-All companies, announcements and borrow observations supplied with the prototype are illustrative. The sample dataset is designed to demonstrate workflow and calculations without representing current investment recommendations.
+## Development roadmap
 
-A research release may use public announcements and permitted market data. A production-quality borrow model would require authorised point-in-time histories of fees, availability, utilization, lender concentration, locates and recalls.
+### Phase 1 — Working monitor ✅
 
-### Data-quality controls
+- Sample UK and European event universe
+- Earnings and corporate-action classification
+- Sector mapping and event drilldown
+- Borrow-pressure prioritisation
+- Seven-day and one-month horizons
+- Scenario heatmaps, email draft and tests
 
-| Risk | Required control |
-|---|---|
-| Duplicate or amended announcements | Preserve issuer, timestamp, source URL and version; prefer the latest validated terms. |
-| Look-ahead bias | Use only fields available at the decision timestamp. |
-| Identifier changes | Maintain dated ticker, ISIN and SEDOL mappings. |
-| Survivorship bias | Retain delisted, acquired and failed issuers in historical tests. |
-| Public borrow proxies | Label them clearly and avoid presenting them as executable availability. |
-| Stale prices or fees | Show observation timestamps and reject stale inputs. |
-| Ambiguous event terms | Route to manual review rather than inferring missing economics. |
+### Phase 2 — Relative-value research
 
-## Backtest design
+- Point-in-time peer selection and historical spread analysis
+- Beta-adjusted hedge ratios
+- Transaction, dividend, financing and borrow costs
+- Position sizing and risk budgeting
 
-A defensible event study should freeze the investable universe and information set at each timestamp, then measure forward outcomes separately over seven trading days and one month. It should report coverage, missingness, turnover, hit rate, average and median return, drawdown, tail loss and cost sensitivity. Pair candidates should be compared with simple sector- or factor-matched baselines. Small or synthetic samples must be described as demonstrations, not evidence of a profitable strategy.
+### Phase 3 — Historical validation
 
-## Next research steps
+- Timestamped announcement database
+- Point-in-time FTSE membership and identifier histories
+- Event studies by sector, event and liquidity bucket
+- Borrow and recall stress tests
+- Out-of-sample validation and model-risk review
 
-1. Create a timestamped historical announcement dataset.
-2. Add point-in-time FTSE membership and identifier histories.
-3. Build defensible peer selection using sector, beta, size and liquidity.
-4. Add event-time seven-day and one-month backtests.
-5. Include transaction, dividend, financing and borrow costs.
-6. Validate borrow-pressure indicators against authorised stock-loan observations.
-7. Add controlled Excel export for the morning meeting.
-8. Add a SQL event store and ingestion audit table.
-9. Add an optional Excel/VBA refresh example for desk users.
+### Phase 4 — Controlled desk integration
 
-## Disclaimer
+- Authorised event, price and stock-loan feeds
+- SQL event and decision history
+- Excel morning-meeting interface
+- Narrow VBA refresh and export controls
+- Inventory matching and approval workflow
 
-This project is educational research software. It is not investment advice, an execution system or a guarantee of profit. All corporate-action terms, prices, borrow conditions and risks require independent verification.
+---
+
+## What this project is—and is not
+
+> **This project is:** an auditable research and decision-support framework connecting corporate actions, earnings, relative-value analysis, securities-finance economics and risk controls.
+
+> **This project is not:** a guarantee of profit, an autonomous execution system, investment advice or a substitute for verified event instructions, confirmed locates and professional risk oversight.
+
+## Core design principle
+
+> **Do not rank the most exciting announcement first. Rank the opportunity with the strongest net economics, clearest catalyst, most dependable borrow and most acceptable downside first.**

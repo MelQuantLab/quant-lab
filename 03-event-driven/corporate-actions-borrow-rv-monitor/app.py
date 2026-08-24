@@ -5,7 +5,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from analytics import build_daily_brief, earnings_signal, enrich_events, filter_horizon, scenario_grid
+from analytics import (
+    build_daily_brief,
+    earnings_signal,
+    enrich_events,
+    filter_horizon,
+    incremental_lending_revenue,
+    scenario_grid,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -83,7 +90,17 @@ m2.metric("Urgent inventory reviews", urgent)
 m3.metric("Research watchlist", watchlist)
 m4.metric("Review / reject", review + rejected)
 
-tabs = st.tabs(["Morning monitor", "Heatmaps", "Event drilldown", "Earnings lab", "Relative-value scenarios", "Daily email draft", "Methodology"])
+tabs = st.tabs([
+    "Morning monitor",
+    "Heatmaps",
+    "Event drilldown",
+    "Earnings lab",
+    "Relative-value scenarios",
+    "Desk economics",
+    "Daily email draft",
+    "Integration roadmap",
+    "Methodology",
+])
 
 with tabs[0]:
     st.subheader("Priority queue")
@@ -100,7 +117,7 @@ with tabs[0]:
             "Net return %": st.column_config.NumberColumn(format="%.2f"),
             "Stress loss %": st.column_config.NumberColumn(format="%.2f"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         height=355,
     )
@@ -120,12 +137,12 @@ with tabs[0]:
         )
         fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, legend_title_text="Event")
         fig.add_hline(y=0.5, line_dash="dot", line_color=AMBER)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with right:
         sector_counts = filtered.groupby(["sector", "decision"], as_index=False).size()
         fig = px.bar(sector_counts, x="sector", y="size", color="decision", title="Decision mix by sector", color_discrete_map={"WATCHLIST": TEAL, "MANUAL REVIEW": AMBER, "REJECT": RED})
         fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, xaxis_title="", yaxis_title="Events", legend_title_text="")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 with tabs[1]:
     st.subheader("Where attention is clustering")
@@ -138,7 +155,7 @@ with tabs[1]:
         title="Event concentration by sector",
     )
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     pressure_heat = filtered.pivot_table(
         index="sector", columns="event_type", values="borrow_pressure_score", aggfunc="mean"
@@ -153,7 +170,7 @@ with tabs[1]:
         title="Average borrow-pressure indicator",
     )
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 with tabs[2]:
     ticker = st.selectbox("Select an event", filtered.ticker.tolist() if not filtered.empty else events.ticker.tolist())
@@ -203,7 +220,7 @@ with tabs[3]:
         marker_color=[TEAL, CYAN, RED if erow["price_reaction_pct"] < 0 else TEAL, AMBER],
     ))
     fig.update_layout(title="Reported signal and market response", template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, yaxis_title="Percent")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown('<div class="note">A miss is not automatically a short and a beat is not automatically a long. The reaction must be assessed against guidance, peers, valuation, positioning, borrow and downside.</div>', unsafe_allow_html=True)
 
 with tabs[4]:
@@ -224,9 +241,63 @@ with tabs[4]:
         title="Net P&L sensitivity (%)",
     )
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 with tabs[5]:
+    st.subheader("How the desk captures value")
+    st.caption("Translate an early signal into measurable revenue or avoided loss. This calculator isolates fee repricing; it does not include every cost or revenue component.")
+
+    role = st.radio(
+        "Desk perspective",
+        ["Sell-side securities finance", "Asset manager / beneficial owner"],
+        horizontal=True,
+    )
+    if role == "Sell-side securities finance":
+        st.markdown(
+            "**Commercial levers:** reprice scarce inventory earlier, secure term supply, improve locate conversion, allocate balance sheet deliberately and reduce recall or settlement losses."
+        )
+    else:
+        st.markdown(
+            "**Commercial levers:** avoid lending valuable inventory too cheaply, negotiate improved fees, preserve voting/recall optionality and treat borrow demand as market intelligence."
+        )
+
+    e1, e2, e3, e4, e5 = st.columns(5)
+    market_value = e1.number_input("Inventory market value (£)", 100_000.0, 500_000_000.0, 10_000_000.0, 100_000.0)
+    current_fee = e2.number_input("Current fee (%)", 0.0, 100.0, 2.0, 0.25)
+    improved_fee = e3.number_input("Repriced fee (%)", 0.0, 100.0, 7.0, 0.25)
+    loan_days = e4.slider("Days on loan", 1, 365, 30)
+    revenue_share = e5.slider("Revenue retained (%)", 0, 100, 100)
+    economics = incremental_lending_revenue(
+        market_value, current_fee, improved_fee, loan_days, revenue_share
+    )
+
+    v1, v2, v3 = st.columns(3)
+    v1.metric("Fee improvement", f"{economics['fee_improvement_pct']:+.2f}%")
+    v2.metric("Gross incremental revenue", f"£{economics['gross_incremental_revenue']:,.0f}")
+    v3.metric("Retained incremental revenue", f"£{economics['retained_incremental_revenue']:,.0f}")
+    st.code("Market value × fee improvement × days / 365 × revenue share")
+    st.markdown(
+        '<div class="note">Full desk attribution should also include matched-inventory spread, client revenue, balance-sheet cost, collateral economics, operational cost and avoided recall, buy-in or settlement loss.</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("#### From signal to money")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                ["Demand likely to rise", "Secure supply and review client offers", "Capture a better fee or spread"],
+                ["Inventory likely to tighten", "Preserve scarce stock and assess term", "Avoid lending too cheaply"],
+                ["Fee may ease after issuance", "Avoid overpaying for future supply", "Protect financing margin"],
+                ["Recall risk is rising", "Reduce fragile exposure and coordinate operations", "Avoid forced-close and fail costs"],
+                ["Economics fail under stress", "Reject or resize", "Avoid a low-quality loss"],
+            ],
+            columns=["Signal", "Desk action", "Value mechanism"],
+        ),
+        hide_index=True,
+        width="stretch",
+    )
+
+with tabs[6]:
     st.subheader("Review-ready daily briefing")
     st.caption("The application generates a draft only. A human validates sources, terms and recipients before circulation.")
     brief = build_daily_brief(filtered, pd.Timestamp.now(tz="Europe/London").strftime("%d %b %Y %H:%M %Z"))
@@ -246,10 +317,77 @@ with tabs[5]:
             }
         ),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
 
-with tabs[6]:
+with tabs[7]:
+    st.subheader("Bloomberg, SQL, Excel/VBA and email operating model")
+    st.caption("Architecture proposal only: no Bloomberg or internal desk connection is included in this public prototype.")
+
+    st.markdown("#### What connects to what")
+    st.code(
+        "Bloomberg / RNS / issuer events\n"
+        "            ↓\n"
+        "Python validation and analytics ← internal inventory, fees and locates\n"
+        "            ↓\n"
+        "SQL event, signal and decision history\n"
+        "            ↓\n"
+        "Streamlit monitor + controlled Excel desk view\n"
+        "            ↓\n"
+        "VBA refresh/export controls → unsent email draft → trader approval"
+    )
+
+    mode = st.radio("Proposed data mode", ["Bloomberg Terminal / Desktop API", "Enterprise data feeds", "Public research prototype"], horizontal=True)
+    mode_rows = {
+        "Bloomberg Terminal / Desktop API": [
+            ["Market and event data", "Authorised Bloomberg Desktop API session"],
+            ["Inventory and client demand", "Approved internal securities-finance systems"],
+            ["Use case", "Trader-side research and monitored workflow"],
+        ],
+        "Enterprise data feeds": [
+            ["Market and event data", "Licensed enterprise feeds / controlled landing area"],
+            ["Inventory and client demand", "Internal stock-loan platform"],
+            ["Use case", "Scheduled, resilient multi-user production service"],
+        ],
+        "Public research prototype": [
+            ["Market and event data", "Permitted issuer and regulatory sources"],
+            ["Inventory and client demand", "Clearly labelled sample or proxy fields"],
+            ["Use case", "Learning, demonstration and methodology testing"],
+        ],
+    }
+    st.dataframe(
+        pd.DataFrame(mode_rows[mode], columns=["Component", "Source / purpose"]),
+        hide_index=True,
+        width="stretch",
+    )
+
+    st.markdown("#### Why SQL and VBA are included")
+    q1, q2 = st.columns(2)
+    with q1:
+        st.markdown("**SQL is the memory**")
+        st.write("Stores events, amendments, identifiers, borrow snapshots, signals, decisions and realised outcomes so the desk can audit and backtest what was known at the time.")
+        st.code(
+            "SELECT ticker, event_type, borrow_fee_pct,\n"
+            "       utilization_pct, decision\n"
+            "FROM morning_priority_view\n"
+            "ORDER BY priority_score DESC;",
+            language="sql",
+        )
+    with q2:
+        st.markdown("**Excel/VBA is the controlled hand-off**")
+        st.write("Refreshes approved SQL views, flags stale inputs, records approvals and creates a formatted but unsent briefing. Core calculations remain visible and tested in Python.")
+        st.code(
+            "Refresh approved SQL data\n"
+            "Validate mandatory fields\n"
+            "Populate morning sheet\n"
+            "Create unsent Outlook draft\n"
+            "Record approval or rejection",
+            language="text",
+        )
+
+    st.warning("Production controls: entitlements, data licensing, recipient restrictions, source timestamps, maker-checker approval, audit logging and no automatic execution or email release.")
+
+with tabs[8]:
     st.subheader("What this prototype does")
     st.write("It demonstrates a controlled workflow: ingest → validate → assess → risk-gate → monitor → record outcome.")
     st.subheader("What it does not claim")
