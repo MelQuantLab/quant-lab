@@ -7,5 +7,4 @@ if [ ! -x ".venv/bin/python" ]; then
   .venv/bin/python -m pip install -r requirements.txt
 fi
 
-.venv/bin/python -m streamlit run app.py
-
+.venv/bin/python -m streamlit run app.py --server.headless=true --browser.gatherUsageStats=false

@@ -14,6 +14,7 @@ from analytics import (
     scenario_grid,
 )
 from data_store import build_store, joined_event_view
+from free_sources import combine_inbox, fetch_companies_house_filings, fetch_google_news, fetch_rss_feeds
 from reporting import build_excel_report
 from validation import freshness_status, validate_events
 
@@ -130,6 +131,7 @@ tabs = st.tabs([
     "Relative-value scenarios",
     "Desk economics",
     "Daily email draft",
+    "Free-source inbox",
     "Integration roadmap",
     "Data controls",
     "Methodology",
@@ -394,6 +396,88 @@ with tabs[6]:
     )
 
 with tabs[7]:
+    st.subheader("Free-source event inbox")
+    st.caption("Discover public event candidates without a paid terminal. Source links and review status remain attached; no item enters the scenario engine automatically.")
+    st.warning("Free sources do not provide dependable live borrow fees, utilization, locates or lender concentration. Those fields remain illustrative until validated by a lender, broker or authorised stock-loan source.")
+
+    if "free_source_inbox" not in st.session_state:
+        st.session_state.free_source_inbox = pd.DataFrame()
+
+    source_a, source_b = st.columns(2)
+    with source_a:
+        st.markdown("#### News discovery")
+        gdelt_query = st.text_input(
+            "Issuer or event search",
+            value='("Tesco" OR "Sainsbury" OR "Vodafone") (earnings OR takeover OR placing OR dividend)',
+            help="Uses a free UK news RSS search. Results are leads and must be checked against an issuer or regulatory announcement.",
+        )
+        rss_text = st.text_area(
+            "Optional issuer/regulatory RSS or Atom URLs (one per line)",
+            placeholder="Paste public feeds selected by your desk. The app retains every article link.",
+        )
+    with source_b:
+        st.markdown("#### Official UK filings")
+        company_text = st.text_area(
+            "Companies House watchlist (Issuer:company number)",
+            placeholder="Example plc:01234567\nAnother plc:SC012345",
+        )
+        companies_house_key = st.text_input(
+            "Free Companies House API key",
+            type="password",
+            help="Used only for this refresh and not written to the repository or report.",
+        )
+        st.markdown("[Create a free Companies House API key](https://developer.company-information.service.gov.uk/)")
+
+    if st.button("Refresh free public sources", type="primary"):
+        frames, errors = [], []
+        try:
+            frames.append(fetch_google_news(gdelt_query))
+        except Exception as error:
+            errors.append(f"News discovery: {error}")
+        rss_urls = [line.strip() for line in rss_text.splitlines() if line.strip()]
+        if rss_urls:
+            try:
+                frames.append(fetch_rss_feeds(rss_urls))
+            except Exception as error:
+                errors.append(f"RSS/Atom: {error}")
+        company_numbers = {}
+        for line in company_text.splitlines():
+            if ":" in line:
+                issuer, number = line.rsplit(":", 1)
+                company_numbers[issuer.strip()] = number.strip()
+        if company_numbers:
+            try:
+                frames.append(fetch_companies_house_filings(company_numbers, companies_house_key))
+            except Exception as error:
+                errors.append(f"Companies House: {error}")
+        st.session_state.free_source_inbox = combine_inbox(*frames)
+        if errors:
+            st.warning("Some sources could not be refreshed: " + " | ".join(errors))
+
+    inbox = st.session_state.free_source_inbox
+    if inbox.empty:
+        st.info("Choose your search/watchlist and select Refresh. The existing scenario monitor remains available in the other tabs.")
+    else:
+        f1, f2, f3 = st.columns(3)
+        f1.metric("Public-source items", len(inbox))
+        f2.metric("Official filing records", int((inbox.source_type == "OFFICIAL FILING").sum()))
+        f3.metric("Primary checks required", int(inbox.verification_status.str.contains("CHECK|REVIEW").sum()))
+        st.dataframe(
+            inbox,
+            column_config={"source_url": st.column_config.LinkColumn("Open source")},
+            hide_index=True,
+            width="stretch",
+            height=420,
+        )
+        st.download_button(
+            "Download public-source inbox CSV",
+            inbox.to_csv(index=False),
+            "free_source_event_inbox.csv",
+            "text/csv",
+        )
+        st.markdown('<div class="note">Desk workflow: open the source → confirm issuer, security, timestamp and terms → add validated assumptions to the controlled scenario engine → record the decision and reason.</div>', unsafe_allow_html=True)
+
+with tabs[8]:
     st.subheader("Bloomberg, SQL, Excel/VBA and email operating model")
     st.caption("Architecture proposal only: no Bloomberg or internal desk connection is included in this public prototype.")
 
@@ -460,7 +544,7 @@ with tabs[7]:
 
     st.warning("Production controls: entitlements, data licensing, recipient restrictions, source timestamps, maker-checker approval, audit logging and no automatic execution or email release.")
 
-with tabs[8]:
+with tabs[9]:
     st.subheader("Data quality, universe coverage and audit controls")
     st.caption("This public build uses fictional securities and explicitly labelled demonstration memberships.")
     q1, q2, q3, q4 = st.columns(4)
@@ -500,7 +584,7 @@ with tabs[8]:
         st.dataframe(audit_frame, hide_index=True, width="stretch")
         st.download_button("Download audit CSV", audit_frame.to_csv(index=False), "decision_audit.csv", "text/csv")
 
-with tabs[9]:
+with tabs[10]:
     st.subheader("What this prototype does")
     st.write("It demonstrates a controlled workflow: ingest → validate → assess → risk-gate → monitor → record outcome.")
     st.subheader("What it does not claim")

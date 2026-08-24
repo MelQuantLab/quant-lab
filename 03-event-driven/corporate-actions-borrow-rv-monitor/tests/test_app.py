@@ -14,6 +14,7 @@ def test_app_renders_every_operating_view_without_exception():
         "Relative-value scenarios",
         "Desk economics",
         "Daily email draft",
+        "Free-source inbox",
         "Integration roadmap",
         "Data controls",
         "Methodology",

@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interactive%20app-FF4B4B?logo=streamlit&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-16%20passing-06D6A0)
+![Tests](https://img.shields.io/badge/tests-21%20passing-06D6A0)
 ![Status](https://img.shields.io/badge/status-working%20prototype-00C2B8)
 ![CI](https://github.com/MelQuantLab/quant-lab/actions/workflows/corporate-actions-monitor.yml/badge.svg)
 
@@ -78,7 +78,7 @@ A high score means **review sooner**. It is not an instruction to short the stoc
 
 ## What the working application does
 
-The Streamlit interface contains ten connected views:
+The Streamlit interface contains eleven connected views:
 
 1. **Morning monitor** — prioritised events, inventory actions and decision mix.
 2. **Heatmaps** — event concentration and average borrow pressure by sector and event family.
@@ -87,9 +87,23 @@ The Streamlit interface contains ten connected views:
 5. **Relative-value scenarios** — net P&L across spread outcomes and borrow-fee assumptions.
 6. **Desk economics** — fee-repricing and retained-revenue attribution.
 7. **Daily email draft** — a review-ready briefing for validation before circulation.
-8. **Integration roadmap** — Bloomberg, SQL and controlled Excel/VBA operating model.
-9. **Data controls** — universe overlap, freshness, schema exceptions and decision audit.
-10. **Methodology** — formulas, assumptions, limitations and data status.
+8. **Free-source inbox** — GDELT discovery, issuer/regulatory RSS/Atom feeds and official Companies House filings with retained source links.
+9. **Integration roadmap** — Bloomberg, SQL and controlled Excel/VBA operating model.
+10. **Data controls** — universe overlap, freshness, schema exceptions and decision audit.
+11. **Methodology** — formulas, assumptions, limitations and data status.
+
+### Free-data desktop mode
+
+The desktop build can operate without a Bloomberg subscription:
+
+| Free input | What it contributes | Control |
+|---|---|---|
+| Google News RSS search | Broad news discovery across selected issuers and event terms | Discovery only; confirm against a primary source |
+| Issuer/regulatory RSS or Atom | Direct feeds selected by the user | Original URL and publication time retained |
+| Companies House Public Data API | Official UK filing metadata using a free API key | Review the underlying filed document |
+| Manual scenario inputs | Transparent price, cost and stress assumptions | Clearly separated from observed public facts |
+
+Public sources do **not** provide dependable live stock-loan fees, utilization, locates, lender concentration or recalls. The app therefore never labels proxy borrow fields as live. A public-source item must be checked and deliberately transferred into the scenario workflow before it can influence a desk decision.
 
 ### Demonstration universe
 
