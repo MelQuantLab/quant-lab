@@ -41,8 +41,10 @@ quant-lab/
 ├── 01-python-foundations/
 ├── 02-financial-data/
 │   └── moving-average-backtester/
+├── 03-event-driven/
+│   └── corporate-actions-borrow-rv-monitor/
 ├── market_basket_monitor/
-├── 03-quant-research/
+├── 04-quant-research/
 ├── white-papers/
 └── datasets/
 ```
@@ -101,6 +103,13 @@ The Trader Toolkit is being developed as a defined collection:
 - [Market Basket Monitor](market_basket_monitor/)
   — a configurable macOS workflow for market-price alerts, news monitoring,
   weekly reporting and an automatically maintained Excel dashboard.
+
+### 03 — Event-Driven Research
+
+- [Corporate Actions, Borrow & Relative-Value Monitor](03-event-driven/corporate-actions-borrow-rv-monitor/)
+  — a risk-first Streamlit workflow connecting earnings and corporate events
+  with inventory pressure, borrow-aware economics, seven-day and one-month
+  horizons, scenario heatmaps and a review-ready daily briefing.
 
 ## Standards
 

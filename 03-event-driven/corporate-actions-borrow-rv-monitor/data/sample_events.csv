@@ -1,0 +1,10 @@
+event_id,published_at,issuer,ticker,sector,event_type,headline,current_price,reference_price,event_price,new_shares_pct,earnings_surprise_pct,guidance_change_pct,price_reaction_pct,peer_ticker,peer_return_pct,borrow_fee_pct,utilization_pct,availability_score,lender_concentration_pct,event_confidence,days_to_catalyst,liquidity_score,expected_gross_return_pct,stress_loss_pct
+EVT001,2026-08-22 07:02:00,Northstar Retail plc,NSTR,Consumer Staples,Earnings & Guidance,Interim earnings below expectations and full-year guidance reduced,184.0,211.0,0.0,0.0,-6.5,-8.0,-12.8,MRKT,-2.1,5.8,84.0,34.0,62.0,96.0,12,82.0,2.8,-4.6
+EVT002,2026-08-22 07:05:00,Alder Engineering plc,ALDR,Industrials,Equity Issuance,Accelerated placing announced at a discount,326.0,352.0,315.0,12.5,0.0,0.0,-7.4,ENGR,-1.2,3.2,76.0,41.0,71.0,94.0,3,74.0,2.2,-3.5
+EVT003,2026-08-22 07:08:00,Meridian Software plc,MRDN,Technology,Takeover & Merger,Recommended all-cash acquisition subject to shareholder approval,612.0,488.0,630.0,0.0,0.0,0.0,25.4,TECH,1.7,1.4,58.0,68.0,44.0,98.0,28,88.0,1.6,-18.0
+EVT004,2026-08-22 07:11:00,Fairhaven Properties plc,FHPR,Real Estate,Index Change,Expected deletion from the FTSE 250 at the next review,91.5,96.0,0.0,0.0,0.0,0.0,-4.7,PROP,-1.0,7.5,91.0,18.0,79.0,91.0,9,61.0,2.5,-5.2
+EVT005,2026-08-22 07:14:00,Beacon Healthcare plc,BEAC,Healthcare,Earnings & Guidance,Revenue ahead of expectations and guidance increased,742.0,695.0,0.0,0.0,4.8,6.0,6.8,HLTH,1.9,0.8,29.0,86.0,31.0,95.0,30,90.0,1.4,-2.7
+EVT006,2026-08-22 07:17:00,Crown Energy Services plc,CRES,Energy,Equity Issuance,Rights issue proposed to reduce leverage,148.0,176.0,120.0,28.0,0.0,0.0,-15.9,ENRG,-3.2,11.0,94.0,12.0,83.0,97.0,18,58.0,3.4,-7.8
+EVT007,2026-08-22 07:20:00,Harbour Consumer plc,HBCO,Consumer Discretionary,Takeover & Merger,Possible offer period extended,258.0,244.0,285.0,0.0,0.0,0.0,5.7,CONS,0.8,4.1,72.0,47.0,66.0,78.0,14,76.0,2.1,-12.5
+EVT008,2026-08-22 07:23:00,Westbridge Telecom plc,WBTL,Telecommunications,Index Change,Expected FTSE 250 inclusion following market-cap increase,418.0,397.0,0.0,0.0,0.0,0.0,5.3,TELC,1.4,1.1,43.0,77.0,38.0,92.0,9,85.0,1.3,-3.0
+
