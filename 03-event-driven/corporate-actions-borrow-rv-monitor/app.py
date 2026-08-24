@@ -13,6 +13,7 @@ from analytics import (
     incremental_lending_revenue,
     scenario_grid,
 )
+from calendar_sources import fetch_watchlist_calendar
 from data_store import build_store, joined_event_view
 from free_sources import combine_inbox, fetch_companies_house_filings, fetch_google_news, fetch_rss_feeds
 from reporting import build_excel_report
@@ -22,6 +23,7 @@ from validation import freshness_status, validate_events
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "data" / "sample_events.csv"
 SECURITY_MASTER_PATH = ROOT / "data" / "security_master.csv"
+FREE_WATCHLIST_PATH = ROOT / "data" / "free_watchlist.csv"
 
 NAVY = "#06182A"
 PANEL = "#0B2638"
@@ -118,13 +120,13 @@ watchlist = int((filtered.decision == "WATCHLIST").sum())
 rejected = int((filtered.decision == "REJECT").sum())
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Validated events", len(filtered))
-m2.metric("Urgent inventory reviews", urgent)
-m3.metric("Research watchlist", watchlist)
-m4.metric("Review / reject", review + rejected)
+m1.metric("Scenario events · training", len(filtered))
+m2.metric("Scenario inventory reviews", urgent)
+m3.metric("Scenario watchlist", watchlist)
+m4.metric("Scenario review / reject", review + rejected)
 
 tabs = st.tabs([
-    "Morning monitor",
+    "Next 7 days",
     "Heatmaps",
     "Event drilldown",
     "Earnings lab",
@@ -142,7 +144,97 @@ if filtered.empty:
     st.stop()
 
 with tabs[0]:
-    st.subheader("Priority queue")
+    st.subheader("Next 7 days · live free calendar")
+    st.caption("Start here each morning: scheduled earnings and dividend dates for your selected real-company watchlist. Verify every date against the issuer before acting.")
+    st.info(
+        "This calendar covers scheduled earnings, ex-dividend dates and dividend dates. "
+        "For takeovers, shareholder votes, placings, rights issues, index changes and other "
+        "special situations, use the Free-source inbox and validate the original announcement."
+    )
+
+    free_watchlist = pd.read_csv(FREE_WATCHLIST_PATH)
+    if "seven_day_calendar" not in st.session_state:
+        st.session_state.seven_day_calendar = pd.DataFrame()
+        st.session_state.seven_day_exceptions = pd.DataFrame()
+        st.session_state.seven_day_refreshed_at = None
+
+    calendar_markets = st.multiselect(
+        "Calendar markets",
+        sorted(free_watchlist.market.unique()),
+        default=sorted(free_watchlist.market.unique()),
+    )
+    available_watchlist = free_watchlist[free_watchlist.market.isin(calendar_markets)]
+    calendar_tickers = st.multiselect(
+        "Companies to scan",
+        available_watchlist.ticker.tolist(),
+        default=available_watchlist.ticker.tolist(),
+        help="The bundled watchlist is editable in data/free_watchlist.csv.",
+    )
+    selected_watchlist = available_watchlist[available_watchlist.ticker.isin(calendar_tickers)]
+
+    refresh_col, _ = st.columns([1, 3])
+    with refresh_col:
+        refresh_calendar = st.button("Refresh next 7 days", type="primary")
+
+    if refresh_calendar:
+        with st.spinner("Checking free company calendars..."):
+            live_calendar, calendar_exceptions = fetch_watchlist_calendar(selected_watchlist)
+        st.session_state.seven_day_calendar = live_calendar
+        st.session_state.seven_day_exceptions = calendar_exceptions
+        st.session_state.seven_day_refreshed_at = pd.Timestamp.now(tz="Europe/London").strftime("%d %b %Y %H:%M %Z")
+
+    if st.session_state.seven_day_refreshed_at:
+        st.success(f"Last refreshed: {st.session_state.seven_day_refreshed_at}")
+    else:
+        st.info("Not refreshed yet — select the companies above, then click Refresh next 7 days.")
+
+    live_calendar = st.session_state.seven_day_calendar
+    if live_calendar.empty:
+        if st.session_state.seven_day_refreshed_at:
+            st.warning("No scheduled earnings or dividend dates were returned for this watchlist in the next seven days. This is a valid empty result—not evidence that no takeover, vote, rights or index event exists. Check the Free-source inbox for unscheduled and specialist events.")
+    else:
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Upcoming actions", len(live_calendar))
+        k2.metric("Companies", live_calendar.ticker.nunique())
+        k3.metric("Sectors", live_calendar.sector.nunique())
+        k4.metric("Markets", live_calendar.market.nunique())
+        calendar_display = live_calendar.copy()
+        calendar_display["event_date"] = pd.to_datetime(calendar_display.event_date).dt.strftime("%a %d %b %Y")
+        st.dataframe(
+            calendar_display,
+            column_config={"source_url": st.column_config.LinkColumn("Verify source")},
+            hide_index=True,
+            width="stretch",
+            height=330,
+        )
+        sector_summary = live_calendar.groupby(["sector", "event_type"], as_index=False).size()
+        calendar_chart = px.bar(
+            sector_summary,
+            x="sector",
+            y="size",
+            color="event_type",
+            title="Next-seven-day actions by sector",
+            color_discrete_sequence=[TEAL, CYAN, AMBER],
+        )
+        calendar_chart.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, xaxis_title="", yaxis_title="Events")
+        st.plotly_chart(calendar_chart, width="stretch")
+
+    st.markdown("---")
+    st.subheader("Illustrative scenario queue")
+    st.caption("The rows below are fictional training scenarios used to test borrow economics. They are not the live calendar above.")
+    scenario_week = filtered[filtered.days_to_catalyst.between(0, 7)].copy()
+    if scenario_week.empty:
+        st.info("No illustrative scenarios fall within the next seven days under the selected sidebar controls.")
+    else:
+        scenario_week["scenario_date"] = (pd.Timestamp.now().normalize() + pd.to_timedelta(scenario_week.days_to_catalyst, unit="D")).dt.strftime("%a %d %b")
+        st.dataframe(
+            scenario_week[["scenario_date", "issuer", "ticker", "sector", "event_type", "days_to_catalyst", "borrow_pressure_score", "decision"]],
+            hide_index=True,
+            width="stretch",
+        )
+
+    st.markdown("---")
+    st.subheader("Full prioritised scenario queue")
     display = filtered.sort_values(["borrow_pressure_score", "event_confidence"], ascending=False)[
         ["published_at", "ticker", "issuer", "primary_universe", "country", "sector", "event_type", "freshness", "borrow_pressure_score", "inventory_action", "net_expected_return_pct", "stress_loss_pct", "decision"]
     ].copy()

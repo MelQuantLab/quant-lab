@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interactive%20app-FF4B4B?logo=streamlit&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-21%20passing-06D6A0)
+![Tests](https://img.shields.io/badge/tests-22%20passing-06D6A0)
 ![Status](https://img.shields.io/badge/status-working%20prototype-00C2B8)
 ![CI](https://github.com/MelQuantLab/quant-lab/actions/workflows/corporate-actions-monitor.yml/badge.svg)
 
@@ -80,7 +80,7 @@ A high score means **review sooner**. It is not an instruction to short the stoc
 
 The Streamlit interface contains eleven connected views:
 
-1. **Morning monitor** — prioritised events, inventory actions and decision mix.
+1. **Next 7 days** — a structured free calendar of scheduled earnings and dividend dates by company, sector and market, followed by a clearly separated illustrative scenario queue.
 2. **Heatmaps** — event concentration and average borrow pressure by sector and event family.
 3. **Event drilldown** — transparent score inputs, economics and rejection reasons.
 4. **Earnings lab** — earnings surprise, guidance change, issuer reaction and peer-relative move.

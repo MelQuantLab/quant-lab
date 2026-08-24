@@ -1,0 +1,23 @@
+issuer,ticker,yahoo_ticker,sector,market
+Tesco plc,TSCO,TSCO.L,Consumer Staples,United Kingdom
+J Sainsbury plc,SBRY,SBRY.L,Consumer Staples,United Kingdom
+Marks and Spencer Group plc,MKS,MKS.L,Consumer Discretionary,United Kingdom
+Vodafone Group plc,VOD,VOD.L,Telecommunications,United Kingdom
+Barclays plc,BARC,BARC.L,Financials,United Kingdom
+HSBC Holdings plc,HSBA,HSBA.L,Financials,United Kingdom
+Lloyds Banking Group plc,LLOY,LLOY.L,Financials,United Kingdom
+BP plc,BP,BP.L,Energy,United Kingdom
+Shell plc,SHEL,SHEL.L,Energy,United Kingdom
+AstraZeneca plc,AZN,AZN.L,Healthcare,United Kingdom
+GSK plc,GSK,GSK.L,Healthcare,United Kingdom
+Unilever plc,ULVR,ULVR.L,Consumer Staples,United Kingdom
+Rolls-Royce Holdings plc,RR,RR.L,Industrials,United Kingdom
+National Grid plc,NG,NG.L,Utilities,United Kingdom
+ASML Holding NV,ASML,ASML.AS,Technology,Netherlands
+Airbus SE,AIR,AIR.PA,Industrials,France
+LVMH SE,MC,MC.PA,Consumer Discretionary,France
+SAP SE,SAP,SAP.DE,Technology,Germany
+Siemens AG,SIE,SIE.DE,Industrials,Germany
+Allianz SE,ALV,ALV.DE,Financials,Germany
+Banco Santander SA,SAN,SAN.MC,Financials,Spain
+Enel SpA,ENEL,ENEL.MI,Utilities,Italy
