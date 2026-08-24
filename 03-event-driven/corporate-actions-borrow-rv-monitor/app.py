@@ -13,10 +13,14 @@ from analytics import (
     incremental_lending_revenue,
     scenario_grid,
 )
+from data_store import build_store, joined_event_view
+from reporting import build_excel_report
+from validation import freshness_status, validate_events
 
 
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "data" / "sample_events.csv"
+SECURITY_MASTER_PATH = ROOT / "data" / "security_master.csv"
 
 NAVY = "#06182A"
 PANEL = "#0B2638"
@@ -56,25 +60,53 @@ st.markdown(
 
 
 @st.cache_data
-def load_events() -> pd.DataFrame:
-    frame = pd.read_csv(DATA_PATH, parse_dates=["published_at"])
-    return enrich_events(frame)
+def load_events() -> tuple[pd.DataFrame, pd.DataFrame]:
+    raw = pd.read_csv(DATA_PATH, parse_dates=["published_at"])
+    valid, exceptions = validate_events(raw)
+    master = pd.read_csv(SECURITY_MASTER_PATH, parse_dates=["effective_from", "effective_to"])
+    store = build_store(valid, master)
+    frame = joined_event_view(store)
+    frame["freshness"] = freshness_status(frame["published_at"])
+    return enrich_events(frame), exceptions
 
 
-events = load_events()
+events, data_exceptions = load_events()
+
+if "decision_audit" not in st.session_state:
+    st.session_state.decision_audit = []
 
 with st.sidebar:
     st.subheader("Morning controls")
     selected_types = st.multiselect("Event families", sorted(events.event_type.unique()), default=sorted(events.event_type.unique()))
     selected_sectors = st.multiselect("Sectors", sorted(events.sector.unique()), default=sorted(events.sector.unique()))
+    selected_universes = st.multiselect(
+        "Index universes",
+        ["FTSE 100", "FTSE 250", "EURO STOXX 50", "STOXX Europe 600"],
+        default=["FTSE 100", "FTSE 250", "EURO STOXX 50", "STOXX Europe 600"],
+    )
+    selected_countries = st.multiselect("Countries", sorted(events.country.dropna().unique()), default=sorted(events.country.dropna().unique()))
+    selected_currencies = st.multiselect("Currencies", sorted(events.currency.dropna().unique()), default=sorted(events.currency.dropna().unique()))
     selected_horizon = st.radio("Catalyst horizon", ["All", "7 day", "1 month"], horizontal=True)
     min_pressure = st.slider("Minimum borrow-pressure indicator", 0, 100, 0, 5)
     st.markdown("---")
     st.caption("All companies and borrow observations in this prototype are illustrative. No live trading recommendation is produced.")
 
+membership_columns = {
+    "FTSE 100": "ftse_100_member",
+    "FTSE 250": "ftse_250_member",
+    "EURO STOXX 50": "euro_stoxx_50_member",
+    "STOXX Europe 600": "stoxx_europe_600_member",
+}
+membership_mask = pd.Series(False, index=events.index)
+for universe in selected_universes:
+    membership_mask |= events[membership_columns[universe]].astype(bool)
+
 filtered = events[
     events.event_type.isin(selected_types)
     & events.sector.isin(selected_sectors)
+    & events.country.isin(selected_countries)
+    & events.currency.isin(selected_currencies)
+    & membership_mask
     & (events.borrow_pressure_score >= min_pressure)
 ].copy()
 filtered = filter_horizon(filtered, selected_horizon)
@@ -99,15 +131,20 @@ tabs = st.tabs([
     "Desk economics",
     "Daily email draft",
     "Integration roadmap",
+    "Data controls",
     "Methodology",
 ])
+
+if filtered.empty:
+    st.warning("No events match the selected controls. Broaden the universe, horizon or borrow-pressure threshold.")
+    st.stop()
 
 with tabs[0]:
     st.subheader("Priority queue")
     display = filtered.sort_values(["borrow_pressure_score", "event_confidence"], ascending=False)[
-        ["published_at", "ticker", "issuer", "sector", "event_type", "borrow_pressure_score", "inventory_action", "net_expected_return_pct", "stress_loss_pct", "decision"]
+        ["published_at", "ticker", "issuer", "primary_universe", "country", "sector", "event_type", "freshness", "borrow_pressure_score", "inventory_action", "net_expected_return_pct", "stress_loss_pct", "decision"]
     ].copy()
-    display.columns = ["Published", "Ticker", "Issuer", "Sector", "Event", "Borrow pressure", "Inventory action", "Net return %", "Stress loss %", "Decision"]
+    display.columns = ["Published", "Ticker", "Issuer", "Primary universe", "Country", "Sector", "Event", "Freshness", "Borrow pressure", "Inventory action", "Net return %", "Stress loss %", "Decision"]
     st.dataframe(
         display,
         column_config={
@@ -120,6 +157,15 @@ with tabs[0]:
         width="stretch",
         hide_index=True,
         height=355,
+    )
+
+    audit_frame = pd.DataFrame(st.session_state.decision_audit)
+    excel_report = build_excel_report(filtered, data_exceptions, audit_frame)
+    st.download_button(
+        "Download controlled Excel report",
+        data=excel_report,
+        file_name="corporate_actions_borrow_monitor.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
     left, right = st.columns([1.15, 1])
@@ -202,6 +248,33 @@ with tabs[2]:
         st.write(row["decision_reason"])
         st.write(f"Expected net return: **{row['net_expected_return_pct']:.2f}%**")
         st.write(f"Reward/stress ratio: **{row['reward_to_stress']:.2f}**")
+
+    st.markdown("#### Desk decision and audit record")
+    override = st.selectbox(
+        "Reviewed decision",
+        list(dict.fromkeys([row["decision"], "WATCHLIST", "MANUAL REVIEW", "REJECT"])),
+        key=f"override_{ticker}",
+    )
+    override_reason = st.text_input(
+        "Reason for confirmation or override",
+        placeholder="Required before recording the desk decision",
+        key=f"reason_{ticker}",
+    )
+    if st.button("Record reviewed decision", key=f"record_{ticker}"):
+        if not override_reason.strip():
+            st.error("Enter a reason before recording the decision.")
+        else:
+            st.session_state.decision_audit.append(
+                {
+                    "recorded_at": pd.Timestamp.now(tz="Europe/London").isoformat(),
+                    "event_id": row["event_id"],
+                    "ticker": ticker,
+                    "model_decision": row["decision"],
+                    "desk_decision": override,
+                    "reason": override_reason.strip(),
+                }
+            )
+            st.success("Decision added to the session audit record.")
 
 with tabs[3]:
     earnings = events[events.event_type == "Earnings & Guidance"].copy()
@@ -388,6 +461,46 @@ with tabs[7]:
     st.warning("Production controls: entitlements, data licensing, recipient restrictions, source timestamps, maker-checker approval, audit logging and no automatic execution or email release.")
 
 with tabs[8]:
+    st.subheader("Data quality, universe coverage and audit controls")
+    st.caption("This public build uses fictional securities and explicitly labelled demonstration memberships.")
+    q1, q2, q3, q4 = st.columns(4)
+    q1.metric("Validated records", len(events))
+    q2.metric("Validation exceptions", len(data_exceptions))
+    q3.metric("Stale event records", int((events.freshness == "STALE").sum()))
+    q4.metric("Recorded desk decisions", len(st.session_state.decision_audit))
+
+    st.markdown("#### Universe overlap")
+    universe_counts = pd.DataFrame(
+        {
+            "Universe": list(membership_columns),
+            "Demonstration members": [int(events[column].astype(bool).sum()) for column in membership_columns.values()],
+        }
+    )
+    fig = px.bar(universe_counts, x="Universe", y="Demonstration members", color="Universe", color_discrete_sequence=[TEAL, CYAN, AMBER, RED])
+    fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, showlegend=False)
+    st.plotly_chart(fig, width="stretch")
+
+    st.markdown("#### Security master")
+    st.dataframe(
+        events[["security_id", "ticker", "issuer", "isin", "sedol", "country", "currency", "exchange", "primary_universe", "data_mode"]].drop_duplicates(),
+        hide_index=True,
+        width="stretch",
+    )
+    st.markdown("#### Validation exceptions")
+    if data_exceptions.empty:
+        st.success("No row-level schema exceptions in the current sample.")
+    else:
+        st.dataframe(data_exceptions, hide_index=True, width="stretch")
+
+    st.markdown("#### Session decision audit")
+    audit_frame = pd.DataFrame(st.session_state.decision_audit)
+    if audit_frame.empty:
+        st.info("No reviewed decisions have been recorded in this session.")
+    else:
+        st.dataframe(audit_frame, hide_index=True, width="stretch")
+        st.download_button("Download audit CSV", audit_frame.to_csv(index=False), "decision_audit.csv", "text/csv")
+
+with tabs[9]:
     st.subheader("What this prototype does")
     st.write("It demonstrates a controlled workflow: ingest → validate → assess → risk-gate → monitor → record outcome.")
     st.subheader("What it does not claim")

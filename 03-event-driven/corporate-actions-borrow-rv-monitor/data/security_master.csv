@@ -1,0 +1,9 @@
+security_id,issuer,ticker,isin,sedol,country,currency,exchange,sector,market_cap_segment,primary_universe,ftse_100_member,ftse_250_member,euro_stoxx_50_member,stoxx_europe_600_member,effective_from,effective_to,data_mode
+SEC001,Northstar Retail plc,NSTR,GB00DEMO0001,D000001,United Kingdom,GBP,London Stock Exchange,Consumer Staples,Large Cap,FTSE 100,True,False,False,True,2026-01-01,,DEMONSTRATION
+SEC002,Alder Engineering plc,ALDR,GB00DEMO0002,D000002,United Kingdom,GBP,London Stock Exchange,Industrials,Mid Cap,FTSE 250,False,True,False,True,2026-01-01,,DEMONSTRATION
+SEC003,Meridian Software plc,MRDN,NL00DEMO0003,D000003,Netherlands,EUR,Euronext Amsterdam,Technology,Large Cap,EURO STOXX 50,False,False,True,True,2026-01-01,,DEMONSTRATION
+SEC004,Fairhaven Properties plc,FHPR,GB00DEMO0004,D000004,United Kingdom,GBP,London Stock Exchange,Real Estate,Mid Cap,FTSE 250,False,True,False,True,2026-01-01,,DEMONSTRATION
+SEC005,Beacon Healthcare plc,BEAC,CH00DEMO0005,D000005,Switzerland,CHF,SIX Swiss Exchange,Healthcare,Large Cap,STOXX Europe 600,False,False,False,True,2026-01-01,,DEMONSTRATION
+SEC006,Crown Energy Services plc,CRES,FR00DEMO0006,D000006,France,EUR,Euronext Paris,Energy,Large Cap,EURO STOXX 50,False,False,True,True,2026-01-01,,DEMONSTRATION
+SEC007,Harbour Consumer plc,HBCO,GB00DEMO0007,D000007,United Kingdom,GBP,London Stock Exchange,Consumer Discretionary,Large Cap,FTSE 100,True,False,False,True,2026-01-01,,DEMONSTRATION
+SEC008,Westbridge Telecom plc,WBTL,DE00DEMO0008,D000008,Germany,EUR,Xetra,Telecommunications,Large Cap,STOXX Europe 600,False,False,False,True,2026-01-01,,DEMONSTRATION

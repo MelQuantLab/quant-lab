@@ -4,8 +4,9 @@
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-interactive%20app-FF4B4B?logo=streamlit&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-11%20passing-06D6A0)
+![Tests](https://img.shields.io/badge/tests-16%20passing-06D6A0)
 ![Status](https://img.shields.io/badge/status-working%20prototype-00C2B8)
+![CI](https://github.com/MelQuantLab/quant-lab/actions/workflows/corporate-actions-monitor.yml/badge.svg)
 
 > **Desk question:** Which newly announced event could change an equity's price, borrow demand, lendable supply, financing economics or settlement risk—and what should the desk review first?
 
@@ -77,15 +78,29 @@ A high score means **review sooner**. It is not an instruction to short the stoc
 
 ## What the working application does
 
-The Streamlit interface contains seven connected views:
+The Streamlit interface contains ten connected views:
 
 1. **Morning monitor** — prioritised events, inventory actions and decision mix.
 2. **Heatmaps** — event concentration and average borrow pressure by sector and event family.
 3. **Event drilldown** — transparent score inputs, economics and rejection reasons.
 4. **Earnings lab** — earnings surprise, guidance change, issuer reaction and peer-relative move.
 5. **Relative-value scenarios** — net P&L across spread outcomes and borrow-fee assumptions.
-6. **Daily email draft** — a review-ready briefing for validation before circulation.
-7. **Methodology** — formulas, assumptions, limitations and data status.
+6. **Desk economics** — fee-repricing and retained-revenue attribution.
+7. **Daily email draft** — a review-ready briefing for validation before circulation.
+8. **Integration roadmap** — Bloomberg, SQL and controlled Excel/VBA operating model.
+9. **Data controls** — universe overlap, freshness, schema exceptions and decision audit.
+10. **Methodology** — formulas, assumptions, limitations and data status.
+
+### Demonstration universe
+
+The public build uses eight fictional securities with explicit demonstration memberships across the intended European coverage model:
+
+- FTSE 100
+- FTSE 250
+- EURO STOXX 50
+- STOXX Europe 600
+
+These are not real constituent claims. The dated security master demonstrates de-duplication, overlapping membership, identifiers, country, currency and effective dates. Real current and historical constituents require an authorised point-in-time source.
 
 ### Dashboard concept
 
@@ -336,7 +351,7 @@ flowchart LR
     style V fill:#E67E22,color:#FFFFFF
 ```
 
-**Implemented now:** Python analytics, Streamlit interface, sample data, downloadable outputs and unit tests.
+**Implemented now:** Python analytics, Streamlit interface, validated sample data, an in-memory DuckDB read model, dated demonstration security master, Excel/text/CSV outputs, decision audit, freshness controls and automated tests.
 
 **Planned institutional extension:** SQL lineage store, licensed feeds, controlled Excel view and narrow VBA automation. Core calculations should remain visible and testable in Python; VBA should automate approved workflow steps rather than conceal analytics.
 
@@ -400,10 +415,16 @@ pytest
 corporate-actions-borrow-rv-monitor/
 ├── app.py
 ├── analytics.py
+├── data_store.py
+├── validation.py
+├── reporting.py
 ├── data/
-│   └── sample_events.csv
+│   ├── sample_events.csv
+│   └── security_master.csv
 ├── tests/
-│   └── test_analytics.py
+│   ├── test_analytics.py
+│   ├── test_app.py
+│   └── test_data_controls.py
 ├── requirements.txt
 ├── pytest.ini
 ├── launch_dashboard.command
@@ -422,6 +443,18 @@ corporate-actions-borrow-rv-monitor/
 - Borrow-pressure prioritisation
 - Seven-day and one-month horizons
 - Scenario heatmaps, email draft and tests
+
+### v0.3 — Data and controls ✅
+
+- DuckDB-backed event and security views
+- Dated European demonstration security master
+- Index, country and currency filters
+- Pydantic schema validation and exception routing
+- Data-freshness indicators
+- Session decision audit with override reasons
+- Controlled multi-sheet Excel export
+- Permanent Streamlit render test
+- GitHub Actions test workflow
 
 ### Phase 2 — Relative-value research
 

@@ -1,0 +1,31 @@
+name: Corporate Actions Monitor Tests
+
+on:
+  push:
+    paths:
+      - "03-event-driven/corporate-actions-borrow-rv-monitor/**"
+      - ".github/workflows/corporate-actions-monitor.yml"
+  pull_request:
+    paths:
+      - "03-event-driven/corporate-actions-borrow-rv-monitor/**"
+      - ".github/workflows/corporate-actions-monitor.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 03-event-driven/corporate-actions-borrow-rv-monitor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: 03-event-driven/corporate-actions-borrow-rv-monitor/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile application
+        run: python -m py_compile app.py analytics.py data_store.py reporting.py validation.py
+      - name: Run test suite
+        run: pytest -q
