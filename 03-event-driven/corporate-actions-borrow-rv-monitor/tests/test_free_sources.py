@@ -8,6 +8,7 @@ def test_headline_classifier_covers_core_event_families():
     assert classify_headline("Company announces accelerated placing") == "Equity Issuance"
     assert classify_headline("Board recommends cash takeover") == "Takeover & Merger"
     assert classify_headline("Full-year results and guidance update") == "Earnings & Guidance"
+    assert classify_headline("Tesco launches café takeover promotion") == "Other corporate event"
 
 
 def test_gdelt_adapter_retains_source_and_requires_verification(monkeypatch):

@@ -33,7 +33,17 @@ INBOX_COLUMNS = [
 EVENT_KEYWORDS = {
     "Earnings & Guidance": ("earnings", "results", "profit warning", "guidance", "trading update"),
     "Equity Issuance": ("placing", "rights issue", "share issue", "equity raise", "offering"),
-    "Takeover & Merger": ("takeover", "acquisition", "merger", "offer for", "scheme of arrangement"),
+    "Takeover & Merger": (
+        "takeover bid",
+        "takeover offer",
+        "takeover approach",
+        "recommended takeover",
+        "cash takeover",
+        "acquisition",
+        "merger",
+        "offer for",
+        "scheme of arrangement",
+    ),
     "Dividend & Capital Return": ("dividend", "buyback", "tender offer", "capital return"),
     "Restructuring & Distress": ("restructuring", "insolvency", "administration", "liquidation", "default"),
     "Index Change": ("index inclusion", "index deletion", "index review", "rebalance"),
@@ -131,21 +141,29 @@ def fetch_rss_feeds(urls: list[str]) -> pd.DataFrame:
     return _as_frame(rows)
 
 
-def fetch_google_news(query: str) -> pd.DataFrame:
+def fetch_google_news(query: str, lookback_days: int = 7) -> pd.DataFrame:
     """Use Google's free UK news RSS search as a resilient discovery source."""
 
     query = query.strip()
     if not query:
         return _as_frame([])
+    dated_query = query if "when:" in query.lower() else f"{query} when:{int(lookback_days)}d"
     url = (
         "https://news.google.com/rss/search?"
-        f"q={quote_plus(query)}&hl=en-GB&gl=GB&ceid=GB:en"
+        f"q={quote_plus(dated_query)}&hl=en-GB&gl=GB&ceid=GB:en"
     )
     result = fetch_rss_feeds([url])
     if not result.empty:
         result["issuer_query"] = query
         result["source_type"] = "NEWS DISCOVERY"
         result["verification_status"] = "REQUIRES PRIMARY-SOURCE CHECK"
+        result["source_name"] = result["headline"].str.rsplit(" - ", n=1).str[-1]
+        result["published_at"] = pd.to_datetime(result["published_at"], utc=True, errors="coerce")
+        cutoff = pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta(days=int(lookback_days))
+        result = result[
+            (result["published_at"] >= cutoff)
+            & (result["event_family"] != "Other corporate event")
+        ].reset_index(drop=True)
     return result
 
 

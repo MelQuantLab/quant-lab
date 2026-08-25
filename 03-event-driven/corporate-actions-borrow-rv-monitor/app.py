@@ -500,7 +500,7 @@ with tabs[7]:
         st.markdown("#### News discovery")
         gdelt_query = st.text_input(
             "Issuer or event search",
-            value='("Tesco" OR "Sainsbury" OR "Vodafone") (earnings OR takeover OR placing OR dividend)',
+        value='("Tesco" OR "Sainsbury" OR "Vodafone Group") (earnings OR takeover OR placing OR dividend)',
             help="Uses a free UK news RSS search. Results are leads and must be checked against an issuer or regulatory announcement.",
         )
         rss_text = st.text_area(
