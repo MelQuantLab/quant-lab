@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -16,7 +17,6 @@ from analytics import (
 from calendar_sources import fetch_watchlist_calendar
 from data_store import build_store, joined_event_view
 from free_sources import combine_inbox, fetch_companies_house_filings, fetch_google_news, fetch_rss_feeds
-from reporting import build_excel_report
 from validation import freshness_status, validate_events
 
 
@@ -93,6 +93,16 @@ def load_events() -> tuple[pd.DataFrame, pd.DataFrame]:
     return enrich_events(frame), exceptions
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def load_live_calendar(
+    universe: pd.DataFrame, scan_date: date
+) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    """Refresh free calendars at most once every 15 minutes for the full universe."""
+    events, exceptions = fetch_watchlist_calendar(universe, as_of=scan_date)
+    checked_at = pd.Timestamp.now(tz="Europe/London").strftime("%d %b %Y %H:%M %Z")
+    return events, exceptions, checked_at
+
+
 events, data_exceptions = load_events()
 
 if "decision_audit" not in st.session_state:
@@ -134,17 +144,6 @@ filtered = events[
 ].copy()
 filtered = filter_horizon(filtered, selected_horizon)
 
-urgent = int((filtered.borrow_pressure_score >= 75).sum())
-review = int((filtered.decision == "MANUAL REVIEW").sum())
-watchlist = int((filtered.decision == "WATCHLIST").sum())
-rejected = int((filtered.decision == "REJECT").sum())
-
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Scenario events · training", len(filtered))
-m2.metric("Scenario inventory reviews", urgent)
-m3.metric("Scenario watchlist", watchlist)
-m4.metric("Scenario review / reject", review + rejected)
-
 tabs = st.tabs([
     "Next 7 days",
     "Heatmaps",
@@ -165,53 +164,55 @@ if filtered.empty:
 
 with tabs[0]:
     st.subheader("Next 7 days · live free calendar")
-    st.caption("Start here each morning: scheduled earnings and dividend dates for your selected real-company watchlist. Verify every date against the issuer before acting.")
+    st.caption("Start here each morning: scheduled earnings and dividend dates across the complete bundled coverage universe. Verify every date against the issuer before acting.")
     st.info(
         "This calendar covers scheduled earnings, ex-dividend dates and dividend dates. "
         "For takeovers, shareholder votes, placings, rights issues, index changes and other "
         "special situations, use the Free-source inbox and validate the original announcement."
     )
 
-    free_watchlist = pd.read_csv(FREE_WATCHLIST_PATH)
-    if "seven_day_calendar" not in st.session_state:
-        st.session_state.seven_day_calendar = pd.DataFrame()
-        st.session_state.seven_day_exceptions = pd.DataFrame()
-        st.session_state.seven_day_refreshed_at = None
+    free_watchlist = (
+        pd.read_csv(FREE_WATCHLIST_PATH)
+        .drop_duplicates(subset=["yahoo_ticker"], keep="first")
+        .sort_values(["market", "ticker"])
+        .reset_index(drop=True)
+    )
 
     calendar_markets = st.multiselect(
         "Calendar markets",
         sorted(free_watchlist.market.unique()),
         default=sorted(free_watchlist.market.unique()),
     )
-    available_watchlist = free_watchlist[free_watchlist.market.isin(calendar_markets)]
-    calendar_tickers = st.multiselect(
-        "Companies to scan",
-        available_watchlist.ticker.tolist(),
-        default=available_watchlist.ticker.tolist(),
-        help="The bundled watchlist is editable in data/free_watchlist.csv.",
+    selected_universe = free_watchlist[free_watchlist.market.isin(calendar_markets)].copy()
+    st.caption(
+        f"Scanning all {selected_universe.yahoo_ticker.nunique()} unique securities in the bundled "
+        f"coverage universe across {selected_universe.market.nunique()} selected markets. "
+        "This is transparent free-source coverage, not the full membership of the four European indices."
     )
-    selected_watchlist = available_watchlist[available_watchlist.ticker.isin(calendar_tickers)]
 
     refresh_col, _ = st.columns([1, 3])
     with refresh_col:
-        refresh_calendar = st.button("Refresh next 7 days", type="primary")
+        refresh_calendar = st.button("Refresh now", type="primary")
 
     if refresh_calendar:
-        with st.spinner("Checking free company calendars..."):
-            live_calendar, calendar_exceptions = fetch_watchlist_calendar(selected_watchlist)
-        st.session_state.seven_day_calendar = live_calendar
-        st.session_state.seven_day_exceptions = calendar_exceptions
-        st.session_state.seven_day_refreshed_at = pd.Timestamp.now(tz="Europe/London").strftime("%d %b %Y %H:%M %Z")
+        load_live_calendar.clear()
 
-    if st.session_state.seven_day_refreshed_at:
-        st.success(f"Last refreshed: {st.session_state.seven_day_refreshed_at}")
-    else:
-        st.info("Not refreshed yet — select the companies above, then click Refresh next 7 days.")
+    scan_date = pd.Timestamp.now(tz="Europe/London").date()
+    with st.spinner("Checking current free company calendars..."):
+        live_calendar, calendar_exceptions, checked_at = load_live_calendar(selected_universe, scan_date)
+    st.success(f"Current scan date: {scan_date.strftime('%A %d %B %Y')} · checked at {checked_at}")
 
-    live_calendar = st.session_state.seven_day_calendar
+    if not calendar_exceptions.empty:
+        st.warning(
+            f"{len(calendar_exceptions)} securities could not be checked. Open Data controls before relying on the result."
+        )
+
     if live_calendar.empty:
-        if st.session_state.seven_day_refreshed_at:
-            st.warning("No scheduled earnings or dividend dates were returned for this watchlist in the next seven days. This is a valid empty result—not evidence that no takeover, vote, rights or index event exists. Check the Free-source inbox for unscheduled and specialist events.")
+        st.warning(
+            "No scheduled earnings or dividend dates were returned for the selected bundled universe "
+            "in the next seven days. This does not mean there are no European corporate actions. "
+            "Use the Free-source inbox for takeovers, votes, placings, rights issues and index events."
+        )
     else:
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("Upcoming actions", len(live_calendar))
@@ -238,71 +239,6 @@ with tabs[0]:
         )
         calendar_chart.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, xaxis_title="", yaxis_title="Events")
         st.plotly_chart(calendar_chart, width="stretch")
-
-    st.markdown("---")
-    st.subheader("Illustrative scenario queue")
-    st.caption("The rows below are fictional training scenarios used to test borrow economics. They are not the live calendar above.")
-    scenario_week = filtered[filtered.days_to_catalyst.between(0, 7)].copy()
-    if scenario_week.empty:
-        st.info("No illustrative scenarios fall within the next seven days under the selected sidebar controls.")
-    else:
-        scenario_week["scenario_date"] = (pd.Timestamp.now().normalize() + pd.to_timedelta(scenario_week.days_to_catalyst, unit="D")).dt.strftime("%a %d %b")
-        st.dataframe(
-            scenario_week[["scenario_date", "issuer", "ticker", "sector", "event_type", "days_to_catalyst", "borrow_pressure_score", "decision"]],
-            hide_index=True,
-            width="stretch",
-        )
-
-    st.markdown("---")
-    st.subheader("Full prioritised scenario queue")
-    display = filtered.sort_values(["borrow_pressure_score", "event_confidence"], ascending=False)[
-        ["published_at", "ticker", "issuer", "primary_universe", "country", "sector", "event_type", "freshness", "borrow_pressure_score", "inventory_action", "net_expected_return_pct", "stress_loss_pct", "decision"]
-    ].copy()
-    display.columns = ["Published", "Ticker", "Issuer", "Primary universe", "Country", "Sector", "Event", "Freshness", "Borrow pressure", "Inventory action", "Net return %", "Stress loss %", "Decision"]
-    st.dataframe(
-        display,
-        column_config={
-            "Borrow pressure": st.column_config.ProgressColumn(
-                "Borrow pressure", min_value=0, max_value=100, format="%d"
-            ),
-            "Net return %": st.column_config.NumberColumn(format="%.2f"),
-            "Stress loss %": st.column_config.NumberColumn(format="%.2f"),
-        },
-        width="stretch",
-        hide_index=True,
-        height=355,
-    )
-
-    audit_frame = pd.DataFrame(st.session_state.decision_audit)
-    excel_report = build_excel_report(filtered, data_exceptions, audit_frame)
-    st.download_button(
-        "Download controlled Excel report",
-        data=excel_report,
-        file_name="corporate_actions_borrow_monitor.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-    left, right = st.columns([1.15, 1])
-    with left:
-        fig = px.scatter(
-            filtered,
-            x="stress_loss_pct",
-            y="net_expected_return_pct",
-            size="borrow_pressure_score",
-            color="event_type",
-            hover_name="ticker",
-            hover_data=["issuer", "decision"],
-            title="Net return versus stressed loss",
-            color_discrete_sequence=[TEAL, CYAN, AMBER, RED],
-        )
-        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, legend_title_text="Event")
-        fig.add_hline(y=0.5, line_dash="dot", line_color=AMBER)
-        st.plotly_chart(fig, width="stretch")
-    with right:
-        sector_counts = filtered.groupby(["sector", "decision"], as_index=False).size()
-        fig = px.bar(sector_counts, x="sector", y="size", color="decision", title="Decision mix by sector", color_discrete_map={"WATCHLIST": TEAL, "MANUAL REVIEW": AMBER, "REJECT": RED})
-        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor=PANEL, xaxis_title="", yaxis_title="Events", legend_title_text="")
-        st.plotly_chart(fig, width="stretch")
 
 with tabs[1]:
     st.subheader("Where attention is clustering")

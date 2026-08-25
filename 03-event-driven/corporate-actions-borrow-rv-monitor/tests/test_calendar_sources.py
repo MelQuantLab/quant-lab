@@ -6,8 +6,11 @@ from calendar_sources import fetch_watchlist_calendar
 
 
 class FakeTicker:
+    calls = []
+
     def __init__(self, _ticker):
-        pass
+        self.ticker = _ticker
+        self.calls.append(_ticker)
 
     def get_calendar(self):
         return {
@@ -27,3 +30,21 @@ def test_calendar_only_keeps_events_inside_seven_day_window():
     assert len(events) == 1
     assert events.iloc[0]["days_remaining"] == 3
     assert events.iloc[0]["event_type"] == "Earnings & Guidance"
+
+
+def test_calendar_deduplicates_vendor_tickers_before_fetching():
+    FakeTicker.calls = []
+    duplicate_universe = pd.DataFrame(
+        [
+            {"issuer": "Example plc", "ticker": "EXM", "yahoo_ticker": "EXM.L", "sector": "Industrials", "market": "United Kingdom"},
+            {"issuer": "Example plc", "ticker": "EXM", "yahoo_ticker": "EXM.L", "sector": "Industrials", "market": "United Kingdom"},
+        ]
+    )
+
+    events, exceptions = fetch_watchlist_calendar(
+        duplicate_universe, as_of=date(2026, 8, 24), ticker_factory=FakeTicker
+    )
+
+    assert exceptions.empty
+    assert FakeTicker.calls == ["EXM.L"]
+    assert len(events) == 1

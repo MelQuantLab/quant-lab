@@ -1,4 +1,4 @@
-"""Structured free calendar adapter for a defined European equity watchlist."""
+"""Structured free calendar adapter for a defined European equity universe."""
 
 from __future__ import annotations
 
@@ -45,12 +45,17 @@ def fetch_watchlist_calendar(
     horizon_days: int = 7,
     ticker_factory: Callable = yf.Ticker,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return upcoming earnings/ex-dividend dates plus ticker-level exceptions."""
+    """Return upcoming earnings/ex-dividend dates plus ticker-level exceptions.
+
+    Duplicate vendor tickers are removed before requests are made so the same
+    security cannot appear twice merely because it was assigned to two baskets.
+    """
 
     start = as_of or date.today()
     end = start + timedelta(days=horizon_days)
     rows, exceptions = [], []
-    for item in watchlist.itertuples(index=False):
+    unique_universe = watchlist.drop_duplicates(subset=["yahoo_ticker"], keep="first")
+    for item in unique_universe.itertuples(index=False):
         try:
             calendar = ticker_factory(item.yahoo_ticker).get_calendar() or {}
             candidates = {
