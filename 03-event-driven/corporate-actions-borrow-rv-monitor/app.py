@@ -34,14 +34,23 @@ RED = "#FF6B6B"
 TEXT = "#EAF6F6"
 
 
-st.set_page_config(page_title="Corporate Actions Borrow & RV Monitor", page_icon="◆", layout="wide")
+st.set_page_config(
+    page_title="Corporate Actions Borrow & RV Monitor",
+    page_icon="◆",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 st.markdown(
     f"""
     <style>
     .stApp {{background: radial-gradient(circle at 85% 5%, #103C52 0%, {NAVY} 35%, #04111F 100%); color:{TEXT};}}
     [data-testid="stSidebar"] {{background:{PANEL}; border-right:1px solid #1B5268;}}
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {{color:{TEXT} !important;}}
     [data-testid="stMetric"] {{background:linear-gradient(145deg,#0A2A3D,#0B2233); border:1px solid #1C5368;
         padding:15px; border-radius:12px; box-shadow:0 8px 25px rgba(0,0,0,.18);}}
+    [data-testid="stMetricLabel"] p {{color:#C8E3E9 !important; font-weight:650;}}
     div[data-testid="stMetricValue"] {{color:{TEAL};}}
     .hero {{padding:22px 26px; border:1px solid #1E6075; border-radius:16px;
         background:linear-gradient(120deg,rgba(11,38,56,.96),rgba(7,63,76,.74)); margin-bottom:18px;}}
@@ -50,7 +59,18 @@ st.markdown(
     .hero p {{color:#B8D5DE; margin:0; max-width:900px;}}
     .note {{border-left:4px solid {AMBER}; background:#102C3D; padding:11px 15px; border-radius:5px; color:#D9E8EC;}}
     .stTabs [data-baseweb="tab-list"] {{gap:8px;}}
-    .stTabs [data-baseweb="tab"] {{background:#0A2638; border-radius:8px; padding:8px 14px;}}
+    .stTabs [data-baseweb="tab"] {{background:#0A2638; border:1px solid #1C5368; border-radius:8px; padding:8px 14px;}}
+    .stTabs [data-baseweb="tab"] p {{color:#D8EDF1 !important; font-weight:650;}}
+    .stTabs [aria-selected="true"] {{background:#0E4B57 !important; border-color:{TEAL} !important;}}
+    .stTabs [aria-selected="true"] p {{color:white !important;}}
+    [data-testid="stWidgetLabel"] p {{color:#D8EDF1 !important; font-weight:650;}}
+    [data-baseweb="select"] > div {{background:#102C3D !important; border-color:#2E7182 !important;}}
+    [data-baseweb="tag"] {{background:#087E78 !important;}}
+    [data-baseweb="tag"] span {{color:white !important;}}
+    [data-testid="stAlert"] {{background:#0E3045 !important; border:1px solid #2B7185;}}
+    [data-testid="stAlert"] p {{color:#E8F5F7 !important;}}
+    .stCaptionContainer p, [data-testid="stCaptionContainer"] p {{color:#BBD5DC !important;}}
+    .block-container {{padding-top:2rem; padding-bottom:3rem;}}
     </style>
     <div class="hero">
       <div class="eyebrow">MELQUANTLAB · EVENT-DRIVEN RESEARCH</div>
