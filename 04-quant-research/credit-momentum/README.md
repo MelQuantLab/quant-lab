@@ -261,10 +261,15 @@ Validate prices → monthly observations → target weights → lagged holdings
 
 | File | Responsibility |
 | --- | --- |
-| `credit_momentum.py` | Offline engine; named functions separate validation, signals, trading and metrics |
+| `credit_momentum.py` | Strategy: monthly signals, holdings, costs and benchmark comparison |
+| `backtest_helpers.py` | Input checks, performance metrics, summary and command-line exports |
 | `download_data.py` | Public-data download and retrieval metadata |
 | `build_report.py` | Fixed sensitivity comparisons and chart/export generation |
 | `tests/test_credit_momentum.py` | Financial timing and accounting checks using synthetic data |
+
+The main script is about 150 lines. Supporting checks and reporting live in
+`backtest_helpers.py`; the complete implementation is larger than 150 lines.
+Keep both files together when running the script.
 
 `run_backtest` takes the settings directly as function inputs; `metrics`
 summarises the returns. For example, `run_backtest(prices, cost_bps=10)` runs
