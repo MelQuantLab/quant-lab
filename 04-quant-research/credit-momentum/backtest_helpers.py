@@ -3,14 +3,12 @@
 import argparse
 import calendar
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-ASSETS = ["HYG", "LQD", "SHY"]
-CREDIT_ASSETS = ["HYG", "LQD"]
-DEFENSIVE_ASSET = "SHY"
 MONTHS_PER_YEAR = 12
 BASIS_POINTS_PER_UNIT = 10_000
 MIN_EVALUATION_MONTHS = 12
@@ -45,17 +43,17 @@ def metrics(returns, shy_returns):
     }
 
 
-def get_monthly_prices(prices):
+def get_monthly_prices(prices, assets):
     """Validate aligned inputs and retain each month's final trading date."""
     if not isinstance(prices.index, pd.DatetimeIndex):
         raise ValueError("Prices require a DatetimeIndex")
     if prices.index.has_duplicates or not prices.index.is_monotonic_increasing:
         raise ValueError("Dates must be unique and sorted")
-    for asset in ASSETS:
-        if asset not in prices.columns:
-            raise ValueError("Prices must include HYG, LQD and SHY")
+    missing = [asset for asset in assets if asset not in prices.columns]
+    if missing:
+        raise ValueError(f"Prices are missing columns: {missing}")
 
-    aligned_prices = prices[ASSETS].copy()
+    aligned_prices = prices[assets].copy()
     invalid_values = not np.isfinite(aligned_prices.to_numpy()).all()
     nonpositive_values = (aligned_prices <= 0).any().any()
     if aligned_prices.empty or invalid_values or nonpositive_values:
@@ -89,24 +87,24 @@ def get_monthly_prices(prices):
     return monthly_prices
 
 
-def get_summary(frame, settings):
+def get_summary(frame, config):
     """Report the continuous run and fixed descriptive subperiods."""
+    credit_weight_columns = [f"weight_{asset}" for asset in config.credit_assets]
+    benchmark = config.benchmark_asset
     summary = {
-        "config": settings,
+        "config": asdict(config),
         "start": str(frame.index[0].date()),
         "end": str(frame.index[-1].date()),
-        "average_credit_weight": float(
-            frame[["weight_HYG", "weight_LQD"]].sum(axis=1).mean()
-        ),
+        "average_credit_weight": float(frame[credit_weight_columns].sum(axis=1).mean()),
         "annualised_turnover": float(frame["turnover"].mean() * MONTHS_PER_YEAR),
         "portfolios": {},
     }
     portfolio_returns = {
         "Credit momentum": frame["strategy_return"],
-        "50/50 credit blend": frame["blend_return"],
-        "HYG buy-and-hold": frame["HYG_return"],
+        "Equal-weight credit blend": frame["blend_return"],
+        f"{benchmark} buy-and-hold": frame[f"{benchmark}_return"],
     }
-    defensive_returns = frame["SHY_return"]
+    defensive_returns = frame[f"{config.defensive_asset}_return"]
 
     for name, returns in portfolio_returns.items():
         portfolio_metrics = {"full_sample": metrics(returns, defensive_returns)}
@@ -120,21 +118,36 @@ def get_summary(frame, settings):
     return summary
 
 
-def run_cli(run_backtest):
+def run_cli(run_backtest, config_class):
     """Read local prices and export an auditable backtest run."""
+    defaults = config_class()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--csv", required=True, help="Adjusted daily prices: Date,HYG,LQD,SHY"
-    )
+    parser.add_argument("--csv", required=True, help="Adjusted daily prices")
     parser.add_argument("--output-dir", default="reports/default")
-    parser.add_argument("--momentum-months", type=int, default=6)
-    parser.add_argument("--cost-bps", type=float, default=10)
+    parser.add_argument("--credit-assets", nargs="+", default=defaults.credit_assets)
+    parser.add_argument("--defensive-asset", default=defaults.defensive_asset)
+    parser.add_argument("--benchmark-asset", default=defaults.benchmark_asset)
+    parser.add_argument("--momentum-months", type=int, default=defaults.momentum_months)
+    parser.add_argument(
+        "--volatility-months", type=int, default=defaults.volatility_months
+    )
+    parser.add_argument("--cost-bps", type=float, default=defaults.cost_bps)
+    parser.add_argument(
+        "--max-credit-weight", type=float, default=defaults.max_credit_weight
+    )
     args = parser.parse_args()
 
-    prices = pd.read_csv(args.csv, index_col="Date", parse_dates=True)
-    frame, summary = run_backtest(
-        prices, momentum_months=args.momentum_months, cost_bps=args.cost_bps
+    config = config_class(
+        credit_assets=tuple(args.credit_assets),
+        defensive_asset=args.defensive_asset,
+        benchmark_asset=args.benchmark_asset,
+        momentum_months=args.momentum_months,
+        volatility_months=args.volatility_months,
+        cost_bps=args.cost_bps,
+        max_credit_weight=args.max_credit_weight,
     )
+    prices = pd.read_csv(args.csv, index_col="Date", parse_dates=True)
+    frame, summary = run_backtest(prices, config)
 
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -142,22 +155,3 @@ def run_cli(run_backtest):
     summary_json = json.dumps(summary, indent=2, allow_nan=False)
     (output / "metrics.json").write_text(summary_json + "\n", encoding="utf-8")
     print(summary_json)
-
-
-def get_settings(momentum_months, volatility_months, cost_bps, max_credit_weight):
-    """Check the settings and record them for the results summary."""
-    if momentum_months < 1 or volatility_months < 2:
-        raise ValueError(
-            "Lookbacks must be positive; volatility needs at least 2 months"
-        )
-    if not np.isfinite(cost_bps) or not 0 <= cost_bps < 5000:
-        raise ValueError("Cost must be finite and between 0 and 5,000 bps")
-    if not 0 < max_credit_weight <= 1:
-        raise ValueError("Credit cap must be in (0, 1]")
-
-    return {
-        "momentum_months": momentum_months,
-        "volatility_months": volatility_months,
-        "cost_bps": cost_bps,
-        "max_credit_weight": max_credit_weight,
-    }

@@ -16,7 +16,7 @@ MOMENTUM_LOOKBACKS = (3, 6, 12)
 COST_SCENARIOS_BPS = (0, 10, 25)
 PORTFOLIO_LABELS = {
     "strategy_return": "Credit momentum",
-    "blend_return": "50/50 credit blend",
+    "blend_return": "Equal-weight credit blend",
     "HYG_return": "HYG buy-and-hold",
 }
 

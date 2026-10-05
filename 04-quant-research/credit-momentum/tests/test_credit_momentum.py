@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from credit_momentum import metrics, run_backtest
+from credit_momentum import StrategyConfig, metrics, run_backtest
 
 WEIGHT_COLUMNS = ["weight_HYG", "weight_LQD", "weight_SHY"]
 
@@ -97,3 +97,19 @@ def test_missing_month_rejected(sample_prices):
     missing_month_prices = sample_prices.drop(sample_prices.index[20])
     with pytest.raises(ValueError, match="contiguous"):
         run_backtest(missing_month_prices)
+
+
+def test_equal_weight_benchmark_scales_to_three_credit_assets(sample_prices):
+    prices = sample_prices.copy()
+    month_number = np.arange(len(prices))
+    prices["CREDIT3"] = 100 * np.exp(0.006 * month_number + 0.01 * np.sin(month_number))
+    config = StrategyConfig(credit_assets=("HYG", "LQD", "CREDIT3"), cost_bps=0)
+    frame, summary = run_backtest(prices, config)
+
+    # With no costs, an equally weighted three-asset portfolio earns the
+    # arithmetic mean of the three monthly returns, not the old two-asset blend.
+    asset_returns = prices[list(config.credit_assets)].pct_change().loc[frame.index]
+    expected_returns = asset_returns.mean(axis=1)
+    assert np.allclose(frame["blend_return"], expected_returns)
+    assert "Equal-weight credit blend" in summary["portfolios"]
+    assert "50/50 credit blend" not in summary["portfolios"]

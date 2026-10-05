@@ -7,7 +7,9 @@ from pathlib import Path
 
 import yfinance as yf
 
-from credit_momentum import ASSETS
+from credit_momentum import StrategyConfig
+
+ASSETS = StrategyConfig().assets
 
 DOWNLOAD_START = "2007-01-01"
 DOWNLOAD_END_EXCLUSIVE = "2026-01-01"

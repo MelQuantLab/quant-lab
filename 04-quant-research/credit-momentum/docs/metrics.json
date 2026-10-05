@@ -1,9 +1,17 @@
 {
   "config": {
+    "credit_assets": [
+      "HYG",
+      "LQD"
+    ],
+    "defensive_asset": "SHY",
+    "benchmark_asset": "HYG",
     "momentum_months": 6,
     "volatility_months": 12,
     "cost_bps": 10.0,
-    "max_credit_weight": 0.6
+    "max_credit_weight": 0.6,
+    "start": "2008-05-01",
+    "end": "2025-12-31"
   },
   "start": "2008-05-30",
   "end": "2025-12-31",
@@ -36,7 +44,7 @@
         "maximum_drawdown_month_end": -0.07312570820333075
       }
     },
-    "50/50 credit blend": {
+    "Equal-weight credit blend": {
       "full_sample": {
         "months": 212,
         "total_return": 1.2517643111702639,
