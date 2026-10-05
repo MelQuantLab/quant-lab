@@ -127,6 +127,26 @@ claim when later-period Sharpe fails to exceed passive credit, as it does here.
 
 ## Reproduce
 
+### Reading the code
+
+The research follows one short pipeline:
+
+```text
+Validate prices → monthly observations → target weights → lagged holdings
+→ drift-aware trading costs → net returns → performance summary
+```
+
+| File | Responsibility |
+| --- | --- |
+| `credit_momentum.py` | Offline engine; named functions separate validation, signals, trading and metrics |
+| `download_data.py` | Public-data download and retrieval metadata |
+| `build_report.py` | Fixed sensitivity comparisons and chart/export generation |
+| `tests/test_credit_momentum.py` | Financial timing and accounting checks using synthetic data |
+
+The public `Config`, `run_backtest` and `metrics` interfaces are type annotated.
+Comments explain the financial assumptions, especially the signal lag, allocation
+caps, Treasury residual, two-sided turnover and drift between rebalances.
+
 Python 3.11+:
 
 ```bash
@@ -148,6 +168,16 @@ report builder and tests work offline with the local input.
 Tests cover lagged holdings, future-data perturbation, allocation conservation,
 caps, cash fallback, cost compounding, drift-aware turnover, initial-capital
 drawdown, and rejection of missing/duplicate data or missing calendar months.
+
+For development, install `requirements-dev.txt` and keep formatting and basic
+code checks consistent:
+
+```bash
+pip install -r requirements-dev.txt
+ruff format --check .
+ruff check .
+pytest
+```
 
 ### Data sources
 
