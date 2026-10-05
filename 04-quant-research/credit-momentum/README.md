@@ -143,8 +143,8 @@ Validate prices → monthly observations → target weights → lagged holdings
 | `build_report.py` | Fixed sensitivity comparisons and chart/export generation |
 | `tests/test_credit_momentum.py` | Financial timing and accounting checks using synthetic data |
 
-The public `Config`, `run_backtest` and `metrics` interfaces are type annotated.
-Comments explain the financial assumptions, especially the signal lag, allocation
+`Config` holds the settings; `run_backtest` runs the calculation, and `metrics`
+summarises the returns. Comments explain the signal lag, allocation
 caps, Treasury residual, two-sided turnover and drift between rebalances.
 
 Python 3.11+:

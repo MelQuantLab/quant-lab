@@ -1,15 +1,11 @@
 """Reproduce the fixed-period SPY demonstration using the existing engine."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
-import pandas as pd
 import yfinance as yf
 
 # Allow this standalone script to run directly from an uninstalled checkout.
@@ -23,14 +19,14 @@ DOWNLOAD_START = "2005-01-01"
 DOWNLOAD_END_EXCLUSIVE = "2026-01-01"
 
 
-def write_json(path: Path, content: dict[str, Any]) -> None:
+def write_json(path, content):
     """Write readable JSON and reject nonfinite performance values."""
     path.write_text(
         json.dumps(content, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
 
 
-def load_or_download_prices(csv_path: Path) -> pd.Series:
+def load_or_download_prices(csv_path):
     """Reuse local prices, preserving their original retrieval metadata."""
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     if not csv_path.exists():
@@ -46,7 +42,7 @@ def load_or_download_prices(csv_path: Path) -> pd.Series:
     return load_prices_from_csv(csv_path)
 
 
-def build_manifest(csv_path: Path) -> dict[str, Any]:
+def build_manifest(csv_path):
     """Unknown retrieval details remain null for externally supplied caches."""
     manifest = {
         "provider": "Yahoo Finance via yfinance",
@@ -64,7 +60,7 @@ def build_manifest(csv_path: Path) -> dict[str, Any]:
     return manifest
 
 
-def main() -> None:
+def main():
     csv_path = PROJECT_DIR / "data/raw/spy_2005_2025.csv"
     prices = load_or_download_prices(csv_path)
     result = run_backtest(prices, BacktestConfig())

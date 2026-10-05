@@ -1,7 +1,5 @@
 """Generate the baseline, fixed sensitivity comparisons and research figure."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
@@ -23,7 +21,7 @@ PORTFOLIO_LABELS = {
 }
 
 
-def build_sensitivity(prices: pd.DataFrame) -> pd.DataFrame:
+def build_sensitivity(prices):
     """Keep every predefined scenario; do not select a winning parameter set."""
     scenarios = []
     for momentum_months in MOMENTUM_LOOKBACKS:
@@ -41,7 +39,7 @@ def build_sensitivity(prices: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(scenarios)
 
 
-def plot_performance(frame: pd.DataFrame, output_path: Path) -> None:
+def plot_performance(frame, output_path):
     """Plot equity, month-end drawdown and the baseline portfolio holdings."""
     figure, axes = plt.subplots(
         3,
@@ -83,7 +81,7 @@ def plot_performance(frame: pd.DataFrame, output_path: Path) -> None:
     plt.close(figure)
 
 
-def main() -> None:
+def main():
     """Build the curated evidence bundle from previously downloaded prices."""
     project_dir = Path(__file__).parent
     raw_dir = project_dir / "data/raw"

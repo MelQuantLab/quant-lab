@@ -1,14 +1,10 @@
 """Download adjusted ETF prices and record provenance; raw data stays local."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
-import pandas as pd
 import yfinance as yf
 
 from credit_momentum import ASSETS
@@ -17,7 +13,7 @@ DOWNLOAD_START = "2007-01-01"
 DOWNLOAD_END_EXCLUSIVE = "2026-01-01"
 
 
-def download_adjusted_prices() -> pd.DataFrame:
+def download_adjusted_prices():
     """Retain dates where all three ETFs have an adjusted closing price."""
     downloaded = yf.download(
         ASSETS,
@@ -32,7 +28,7 @@ def download_adjusted_prices() -> pd.DataFrame:
     return prices
 
 
-def build_manifest(prices: pd.DataFrame, csv_path: Path) -> dict[str, Any]:
+def build_manifest(prices, csv_path):
     """Identify the downloaded sample and exact local CSV used in the run."""
     return {
         "provider": "Yahoo Finance via yfinance",
@@ -49,7 +45,7 @@ def build_manifest(prices: pd.DataFrame, csv_path: Path) -> dict[str, Any]:
     }
 
 
-def main() -> None:
+def main():
     output_dir = Path(__file__).parent / "data/raw"
     output_dir.mkdir(parents=True, exist_ok=True)
 

@@ -4,49 +4,48 @@ The engine takes adjusted prices and returns monthly holdings, net portfolio
 returns and summary statistics. Downloads and chart generation live separately.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
 
 CREDIT_ASSETS = ["HYG", "LQD"]
 DEFENSIVE_ASSET = "SHY"
-ASSETS = [*CREDIT_ASSETS, DEFENSIVE_ASSET]
+ASSETS = ["HYG", "LQD", "SHY"]
 MONTHS_PER_YEAR = 12
 BASIS_POINTS_PER_UNIT = 10_000
 MIN_EVALUATION_MONTHS = 12
 SUBPERIODS = [("2008-2015", "2008", "2015"), ("2016-2025", "2016", "2025")]
 
-MetricValues = dict[str, int | float | None]
 
-
-@dataclass(frozen=True)
 class Config:
-    """Fixed signal lookbacks, trading costs and per-ETF allocation cap."""
+    """Settings for the momentum rule and trading costs."""
 
-    momentum_months: int = 6
-    volatility_months: int = 12
-    cost_bps: float = 10.0
-    max_credit_weight: float = 0.60
-
-    def __post_init__(self) -> None:
-        if self.momentum_months < 1 or self.volatility_months < 2:
+    def __init__(
+        self,
+        momentum_months=6,
+        volatility_months=12,
+        cost_bps=10.0,
+        max_credit_weight=0.60,
+    ):
+        if momentum_months < 1 or volatility_months < 2:
             raise ValueError(
                 "Lookbacks must be positive; volatility needs at least 2 months"
             )
-        if not np.isfinite(self.cost_bps) or not 0 <= self.cost_bps < 5000:
+        if not np.isfinite(cost_bps) or not 0 <= cost_bps < 5000:
             raise ValueError("Cost must be finite and between 0 and 5,000 bps")
-        if not 0 < self.max_credit_weight <= 1:
+        if not 0 < max_credit_weight <= 1:
             raise ValueError("Credit cap must be in (0, 1]")
 
+        self.momentum_months = momentum_months
+        self.volatility_months = volatility_months
+        self.cost_bps = cost_bps
+        self.max_credit_weight = max_credit_weight
 
-def metrics(returns: pd.Series, cash: pd.Series) -> MetricValues:
+
+def metrics(returns, cash):
     """Calculate monthly performance, using SHY as the excess-return reference.
 
     The initial capital of one is included in the drawdown peak. A portfolio
@@ -74,14 +73,15 @@ def metrics(returns: pd.Series, cash: pd.Series) -> MetricValues:
     }
 
 
-def _monthly_prices(prices: pd.DataFrame) -> pd.DataFrame:
+def get_monthly_prices(prices):
     """Validate aligned inputs and retain each month's final trading date."""
     if not isinstance(prices.index, pd.DatetimeIndex):
         raise ValueError("Prices require a DatetimeIndex")
     if prices.index.has_duplicates or not prices.index.is_monotonic_increasing:
         raise ValueError("Dates must be unique and sorted")
-    if not set(ASSETS).issubset(prices.columns):
-        raise ValueError("Prices must include HYG, LQD and SHY")
+    for asset in ASSETS:
+        if asset not in prices.columns:
+            raise ValueError("Prices must include HYG, LQD and SHY")
 
     aligned_prices = prices[ASSETS].copy()
     invalid_values = not np.isfinite(aligned_prices.to_numpy()).all()
@@ -104,35 +104,32 @@ def _monthly_prices(prices: pd.DataFrame) -> pd.DataFrame:
     return monthly_prices
 
 
-def _target_weights(
-    monthly_prices: pd.DataFrame,
-    asset_returns: pd.DataFrame,
-    config: Config,
-) -> tuple[pd.DataFrame, pd.Series]:
+def get_target_weights(monthly_prices, asset_returns, config):
     """Build closing targets; the caller lags them before earning returns."""
     momentum = monthly_prices.pct_change(config.momentum_months, fill_method=None)
     volatility = asset_returns.rolling(config.volatility_months).std(ddof=1)
-    excess_momentum = momentum[CREDIT_ASSETS].sub(momentum[DEFENSIVE_ASSET], axis=0)
-    eligible = excess_momentum > 0
+    inverse_volatility = pd.DataFrame(index=monthly_prices.index)
+    for asset in CREDIT_ASSETS:
+        eligible = momentum[asset] > momentum[DEFENSIVE_ASSET]
+        asset_volatility = volatility[asset].replace(0, np.nan)
+        inverse_volatility[asset] = (1 / asset_volatility).where(eligible, 0).fillna(0)
 
-    # Ineligible or zero-volatility credit ETFs receive no allocation.
-    credit_volatility = volatility[CREDIT_ASSETS].replace(0, np.nan)
-    inverse_volatility = (1 / credit_volatility).where(eligible, 0).fillna(0)
-    total_inverse_volatility = inverse_volatility.sum(axis=1).replace(0, np.nan)
-    credit_weights = inverse_volatility.div(total_inverse_volatility, axis=0).fillna(0)
+    # Divide each eligible ETF's score by the total to get portfolio weights.
+    # If neither ETF qualifies, both weights are zero and SHY gets the balance.
+    total_score = inverse_volatility.sum(axis=1).replace(0, np.nan)
+    credit_weights = pd.DataFrame(index=monthly_prices.index)
+    for asset in CREDIT_ASSETS:
+        credit_weights[asset] = (inverse_volatility[asset] / total_score).fillna(0)
 
     # Caps leave a Treasury residual; capped weights are not renormalised.
     credit_weights = credit_weights.clip(upper=config.max_credit_weight)
-    targets = credit_weights.assign(SHY=1 - credit_weights.sum(axis=1))
+    targets = credit_weights.copy()
+    targets["SHY"] = 1 - credit_weights.sum(axis=1)
     history_ready = volatility.notna().all(axis=1) & momentum.notna().all(axis=1)
     return targets, history_ready
 
 
-def _simulate_rebalances(
-    weights: pd.DataFrame,
-    asset_returns: pd.DataFrame,
-    cost_bps: float,
-) -> tuple[pd.Series, pd.Series]:
+def calculate_portfolio_returns(weights, asset_returns, cost_bps):
     """Apply costs before returns and carry drifted weights into each rebalance.
 
     Turnover counts dollars bought and sold. Starting from SHY, a full switch
@@ -144,11 +141,11 @@ def _simulate_rebalances(
     turnover = []
     cost_rate = cost_bps / BASIS_POINTS_PER_UNIT
 
-    for target_weights, month_returns in zip(
-        weights.to_numpy(), asset_returns.to_numpy(), strict=True
-    ):
+    for month in range(len(weights)):
+        target_weights = weights.iloc[month].to_numpy()
+        month_returns = asset_returns.iloc[month].to_numpy()
         traded_weight = float(np.abs(target_weights - drifted_weights).sum())
-        gross_return = float(target_weights @ month_returns)
+        gross_return = float(np.dot(target_weights, month_returns))
         trading_cost = traded_weight * cost_rate
 
         net_returns.append((1 - trading_cost) * (1 + gross_return) - 1)
@@ -161,13 +158,15 @@ def _simulate_rebalances(
     )
 
 
-def _summarise_portfolios(
-    frame: pd.DataFrame,
-    config: Config,
-) -> dict[str, Any]:
+def get_summary(frame, config):
     """Report the continuous run and fixed descriptive subperiods."""
     summary = {
-        "config": asdict(config),
+        "config": {
+            "momentum_months": config.momentum_months,
+            "volatility_months": config.volatility_months,
+            "cost_bps": config.cost_bps,
+            "max_credit_weight": config.max_credit_weight,
+        },
         "start": str(frame.index[0].date()),
         "end": str(frame.index[-1].date()),
         "average_credit_weight": float(
@@ -196,21 +195,22 @@ def _summarise_portfolios(
 
 
 def run_backtest(
-    prices: pd.DataFrame,
-    config: Config | None = None,
-    start: str = "2008-05-01",
-    end: str = "2025-12-31",
-) -> tuple[pd.DataFrame, dict[str, Any]]:
+    prices,
+    config=None,
+    start="2008-05-01",
+    end="2025-12-31",
+):
     """Run the fixed monthly strategy and two cost-aware credit benchmarks.
 
     Price history before the evaluation window supplies the signal warm-up.
     A closing target earns only the following month's return. All portfolios
     begin in SHY and remain open at the end; no liquidation cost is imposed.
     """
-    config = config or Config()
-    monthly_prices = _monthly_prices(prices)
+    if config is None:
+        config = Config()
+    monthly_prices = get_monthly_prices(prices)
     monthly_returns = monthly_prices.pct_change(fill_method=None)
-    targets, history_ready = _target_weights(monthly_prices, monthly_returns, config)
+    targets, history_ready = get_target_weights(monthly_prices, monthly_returns, config)
 
     evaluation_mask = (
         history_ready.shift(1, fill_value=False)
@@ -222,15 +222,15 @@ def run_backtest(
     if len(holdings) < MIN_EVALUATION_MONTHS:
         raise ValueError("Need at least 12 evaluation months after warm-up")
 
-    strategy_returns, strategy_turnover = _simulate_rebalances(
+    strategy_returns, strategy_turnover = calculate_portfolio_returns(
         holdings, asset_returns, config.cost_bps
     )
     blend_weights = pd.DataFrame(
-        np.tile([0.5, 0.5, 0.0], (len(holdings), 1)),
+        {"HYG": 0.5, "LQD": 0.5, "SHY": 0.0},
         index=holdings.index,
         columns=ASSETS,
     )
-    blend_returns, blend_turnover = _simulate_rebalances(
+    blend_returns, blend_turnover = calculate_portfolio_returns(
         blend_weights, asset_returns, config.cost_bps
     )
 
@@ -250,10 +250,10 @@ def run_backtest(
         }
     )
     frame = holdings.add_prefix("weight_").join(performance)
-    return frame, _summarise_portfolios(frame, config)
+    return frame, get_summary(frame, config)
 
 
-def main() -> None:
+def main():
     """Read local prices and export an auditable backtest run."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
