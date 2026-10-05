@@ -113,3 +113,42 @@ def test_equal_weight_benchmark_scales_to_three_credit_assets(sample_prices):
     assert np.allclose(frame["blend_return"], expected_returns)
     assert "Equal-weight credit blend" in summary["portfolios"]
     assert "50/50 credit blend" not in summary["portfolios"]
+
+
+def test_report_uses_configured_assets_and_benchmark(
+    sample_prices, tmp_path, monkeypatch
+):
+    import build_report
+
+    prices = sample_prices.rename(
+        columns={"HYG": "CREDIT1", "LQD": "CREDIT2", "SHY": "TREASURY"}
+    )
+    prices["CREDIT3"] = prices["CREDIT1"] * 1.01
+    config = StrategyConfig(
+        credit_assets=("CREDIT1", "CREDIT2", "CREDIT3"),
+        defensive_asset="TREASURY",
+        benchmark_asset="CREDIT2",
+        cost_bps=25,
+    )
+    frame, _ = run_backtest(prices, config)
+    figures = []
+    original_subplots = build_report.plt.subplots
+
+    def capture_figure(*args, **kwargs):
+        figure, axes = original_subplots(*args, **kwargs)
+        figures.append(figure)
+        return figure, axes
+
+    monkeypatch.setattr(build_report.plt, "subplots", capture_figure)
+    output_path = tmp_path / "performance.png"
+    build_report.plot_performance(frame, output_path, config)
+
+    figure = figures[0]
+    assert output_path.stat().st_size > 0
+    assert figure.axes[0].get_legend_handles_labels()[1] == [
+        "Credit momentum",
+        "Equal-weight credit blend",
+        "CREDIT2 buy-and-hold",
+    ]
+    assert figure.axes[2].get_legend_handles_labels()[1] == config.assets
+    assert "25 bp per traded dollar" in figure._suptitle.get_text()

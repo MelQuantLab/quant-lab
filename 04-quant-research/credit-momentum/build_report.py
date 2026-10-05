@@ -10,15 +10,10 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402 - backend must be selected first
 
-from credit_momentum import run_backtest  # noqa: E402
+from credit_momentum import StrategyConfig, run_backtest  # noqa: E402
 
 MOMENTUM_LOOKBACKS = (3, 6, 12)
 COST_SCENARIOS_BPS = (0, 10, 25)
-PORTFOLIO_LABELS = {
-    "strategy_return": "Credit momentum",
-    "blend_return": "Equal-weight credit blend",
-    "HYG_return": "HYG buy-and-hold",
-}
 
 
 def build_sensitivity(prices):
@@ -40,8 +35,15 @@ def build_sensitivity(prices):
     return pd.DataFrame(scenarios)
 
 
-def plot_performance(frame, output_path):
-    """Plot equity, month-end drawdown and the baseline portfolio holdings."""
+def plot_performance(frame, output_path, config=None):
+    """Plot equity, month-end drawdown and the configured portfolio holdings."""
+    config = config or StrategyConfig()
+    benchmark = config.benchmark_asset
+    labels = {
+        "strategy_return": "Credit momentum",
+        "blend_return": "Equal-weight credit blend",
+        f"{benchmark}_return": f"{benchmark} buy-and-hold",
+    }
     figure, axes = plt.subplots(
         3,
         1,
@@ -51,7 +53,7 @@ def plot_performance(frame, output_path):
     )
     equity_axis, drawdown_axis, allocation_axis = axes
 
-    for column, label in PORTFOLIO_LABELS.items():
+    for column, label in labels.items():
         equity = (1 + frame[column]).cumprod()
         initial_capital_peak = equity.cummax().clip(lower=1)
         drawdown_percent = 100 * (equity / initial_capital_peak - 1)
@@ -61,19 +63,19 @@ def plot_performance(frame, output_path):
     equity_axis.set_ylabel("Growth of $1")
     equity_axis.legend()
     drawdown_axis.set_ylabel("Month-end drawdown (%)")
+    weight_columns = [f"weight_{asset}" for asset in config.assets]
     allocation_axis.stackplot(
         frame.index,
-        frame["weight_HYG"],
-        frame["weight_LQD"],
-        frame["weight_SHY"],
-        labels=["HYG", "LQD", "SHY"],
+        *[frame[column] for column in weight_columns],
+        labels=config.assets,
         alpha=0.8,
     )
     allocation_axis.set_ylabel("Portfolio weight")
     allocation_axis.legend(loc="upper left", ncol=3)
     figure.suptitle(
         "MelQuantLab | Systematic Credit Momentum & Portfolio Construction\n"
-        "May 2008–December 2025 · monthly returns · 10 bp per traded dollar"
+        f"{frame.index[0]:%B %Y}–{frame.index[-1]:%B %Y} · monthly returns · "
+        f"{config.cost_bps:g} bp per traded dollar"
     )
     for axis in axes:
         axis.grid(alpha=0.2)
