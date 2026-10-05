@@ -13,29 +13,67 @@ support a persistent advantage across periods.
 
 ![Credit momentum, benchmarks, drawdown and portfolio allocations](docs/credit_momentum.png)
 
-## 0. The Why
+## Purpose
 
-Connect systematic signal research with a PM decision: when should credit risk
-be owned, how should it be sized, and what happens when both credit sleeves weaken?
-Make the allocation, cost and benchmark evidence inspectable rather than merely
-showing a trading signal.
+**Can changing our credit exposure each month reduce losses while still earning
+reasonable returns?** This project tests that question using a fixed set of
+investment rules and historical ETF data.
 
-## 1. What problem am I trying to solve?
+It connects two decisions: which credit investments have been performing well,
+and how much money to allocate to them. The goal is to measure the trade-off
+between return and risk after trading costs, rather than assume momentum works.
 
-Credit funds combine spread, carry and interest-rate risk. This project tests
-a transparent long-only allocation between HYG (US high-yield credit), LQD
-(US investment-grade credit) and SHY (short Treasury bonds).
+## Who is this for?
 
-This is **ETF total-return momentum**, not issuer-level spread momentum or a
-duration-neutral credit strategy. SHY is a defensive Treasury proxy, not cash
-or a risk-free instrument. Results are in USD without a GBP currency hedge.
+- **Researchers** testing systematic investment ideas.
+- **Portfolio managers** exploring ways to control credit exposure.
+- **Learners** studying Python, backtesting and portfolio allocation.
+- **Recruiters and reviewers** assessing the code, research process and conclusions.
 
-## 2. Why does this matter in financial markets?
+The current project supports research and comparison. Live portfolio use would
+require further validation of data, execution and risk controls.
 
-A credit portfolio can lose money from widening spreads, rising rates and
-liquidity shocks. A PM needs to judge return alongside concentration, drawdown,
-turnover and the opportunity cost of defensive allocations. Momentum may avoid
-some prolonged losses but can react too slowly to a sudden crash or recovery.
+## How it works
+
+| ETF | Portfolio role |
+| --- | --- |
+| HYG | US high-yield corporate bonds |
+| LQD | US investment-grade corporate bonds |
+| SHY | Short-term US Treasury bonds, used for defensive allocation |
+
+Each month, the program:
+
+1. Calculates each ETF's return over the previous six months.
+2. Checks whether HYG or LQD performed better than SHY over that period.
+3. Measures each credit ETF's monthly return volatility over the previous twelve months.
+4. Allocates to qualifying credit ETFs, giving more weight to the less volatile ETF.
+5. Caps each credit ETF at 60% and puts the remaining allocation into SHY.
+6. Applies those holdings the following month, deducts trading costs and records results.
+
+If only HYG qualifies, the portfolio holds **60% HYG and 40% SHY**. If neither
+credit ETF qualifies, it holds **100% SHY**. If both qualify, their relative
+volatility determines the starting weights before the caps are applied.
+
+```mermaid
+flowchart TD
+    A[Adjusted daily ETF prices] --> B[Six-month returns]
+    B --> C{Did either credit ETF outperform SHY?}
+    C -->|Yes| D[Size using twelve-month volatility]
+    D --> E[Cap each credit ETF at 60%]
+    E --> F[Allocate the remainder to SHY]
+    C -->|No| G[Allocate 100% to SHY]
+    F --> H[Apply holdings the following month]
+    G --> H
+    H --> I[Deduct costs and compare performance]
+```
+
+Using the allocation the following month prevents a closing signal from earning
+returns that occurred before the signal was available. Execution still assumes
+an idealised month-end closing rebalance.
+
+This is **ETF total-return momentum**. It does not isolate issuer-level spread
+momentum or remove interest-rate exposure. SHY can lose value; it is a Treasury
+investment rather than literal cash. Results are in USD without a GBP currency hedge.
 
 ## 3. How did I test it?
 
@@ -99,31 +137,116 @@ At 10 bp, three-month momentum has a Sharpe of **0.37** and twelve-month momentu
 **0.51**. Raising baseline costs to 25 bp reduces its Sharpe to **0.55**.
 The result depends materially on the lookback and trading assumptions.
 
-## 4. What did I learn?
+## What is the Sharpe ratio, and why does it matter?
 
-The full-sample result supports a historical risk-control benefit, with a
-substantial return trade-off. The later-period Sharpe reversal challenges a
-claim of stable superiority. A 50/50 blend also underperformed momentum on
-full-sample Sharpe, but lower credit exposure itself can explain some risk
-reduction. No regression or exposure-matched test establishes incremental alpha.
+The Sharpe ratio measures **average excess return per unit of variability in
+that excess return**. It helps judge the reward earned alongside the fluctuations
+experienced. A Sharpe of 0.70 does **not** mean a 70% return.
 
-## 5. What would I improve next?
+This project uses SHY as the reference:
 
-- Test with licensed credit-index total returns, spread duration and rate hedges
-  to distinguish spread momentum from duration and carry.
-- Add exposure-matched benchmarks, daily portfolio valuation and crash/recovery
-  analysis; month-end drawdowns can conceal substantial intramonth losses.
-- Validate next-session execution and crisis bid-offer costs, fund premiums/
-  discounts, capacity and realistic Treasury trading costs.
-- Freeze this version for prospective paper monitoring before making stronger
-  claims. Selected ETFs introduce survivorship and universe-selection limitations.
+```text
+Monthly excess return = portfolio return − SHY return
 
-## 6. What is the bigger picture?
+Annualised Sharpe =
+mean monthly excess return / standard deviation of monthly excess returns × √12
+```
 
-The completed project connects hypothesis, signal, allocation, risk, costs and
-an explicit PM conclusion: **a candidate defensive credit allocation process,
-with insufficient evidence of persistent alpha**. Reject a persistent-superiority
-claim when later-period Sharpe fails to exceed passive credit, as it does here.
+The label **Sharpe versus SHY** makes that choice visible. SHY is not risk-free,
+so this measure differs from a Sharpe calculated using a risk-free cash rate.
+The √12 conversion is the conventional monthly annualisation; serial correlation
+can make that approximation less reliable.
+
+Sharpe matters because the strategy aims to reduce risk. Over the full sample,
+it earned less than HYG, but had a higher Sharpe and a smaller month-end drawdown.
+In 2016–2025, HYG had the higher Sharpe. We therefore assess Sharpe alongside
+return, drawdown, trading costs and period-by-period results.
+
+Sharpe does not fully describe crash risk or establish future performance.
+See [William Sharpe's explanation and limitations](https://web.stanford.edu/~wfsharpe/art/sr/sr.htm).
+
+## Strengths and weaknesses
+
+| Strength | Why it matters |
+| --- | --- |
+| Clear rules | Every allocation can be explained and inspected |
+| Lagged signals | Holdings use information available in the previous month |
+| Trading costs included | Changing positions is not treated as free |
+| Allocation caps | Neither credit ETF can take the entire portfolio |
+| Reproducible evidence | Code, holdings, inputs and tests accompany the conclusions |
+| Honest comparisons | Periods of underperformance are retained |
+
+| Weakness | Effect on the conclusion |
+| --- | --- |
+| Slow signals | Six-month momentum can miss sudden crashes or rapid recoveries |
+| Missed gains | Defensive allocations can reduce long-term returns |
+| Narrow universe | Two selected credit ETFs do not represent all credit strategies |
+| Mixed return drivers | Rates, credit spreads and income all affect the results |
+| Simplified execution | Real trading costs and fill prices could be worse |
+| Month-end drawdowns | Larger losses within a month can be hidden |
+| Period dependence | The full-sample advantage did not persist in the later subperiod |
+
+## Data: why Yahoo Finance?
+
+The project downloads daily ETF prices from **Yahoo Finance through `yfinance`**,
+then selects monthly observations. `yfinance` is an independent Python tool,
+not an official Yahoo-supported library. Its documentation describes research
+and education as its intended use. [yfinance documentation](https://ranaroussi.github.io/yfinance/).
+
+### Advantages
+
+- **Accessible:** the project can be run without a specialist market-data terminal.
+- **Convenient:** Python can download the three ETF histories together.
+- **Historical coverage:** the downloaded sample includes several market conditions.
+- **Adjusted prices:** splits and distributions are reflected in the return series.
+  This matters for bond ETFs because income is part of investor returns.
+  [Yahoo's adjusted-close explanation](https://help.yahoo.com/kb/SLN28256.html).
+
+### Limitations
+
+- **Possible errors:** missing prices and incorrect dividend, split or currency
+  adjustments are documented possibilities. This is not evidence that our particular
+  sample contains those errors. [Data-repair documentation](https://ranaroussi.github.io/yfinance/advanced/price_repair.html).
+- **Access dependence:** an unofficial access tool introduces availability and maintenance risk.
+- **Historical corrections:** later downloads may differ when earlier data is corrected.
+- **Limited detail:** closing ETF prices do not supply historical bid–offer prices,
+  issuer-level spreads or the duration information needed to isolate credit effects.
+- **Execution limits:** adjusted prices are research inputs, not executable historical quotes.
+
+### What the project checks
+
+Raw data stays local. Retrieval details, the library version and an input checksum
+identify the downloaded sample. The engine checks aligned prices, date ordering,
+positive finite values and missing calendar months.
+
+**These controls identify what was tested; they do not prove the prices are correct.**
+The downloader removes dates where any ETF has missing data. An occasional missing
+daily observation can therefore pass through without being flagged. The last-month
+check uses weekdays rather than an exchange-holiday calendar.
+
+A stronger next stage would report dropped dates, investigate unusual returns,
+compare selected prices and distributions with an independent source, and validate
+execution with appropriate licensed market data. Redistribution and commercial
+use must follow the provider's terms; public access does not grant unrestricted
+reuse rights. [yfinance usage notice](https://ranaroussi.github.io/yfinance/).
+
+## What did I learn?
+
+The full-sample evidence supports a historical risk-control benefit with lower
+returns. The later-period Sharpe reversal challenges a claim of stable superiority.
+Lower credit exposure itself can explain some risk reduction; no exposure-matched
+comparison or regression establishes incremental alpha.
+
+The practical conclusion is **a candidate defensive credit allocation process,
+with insufficient evidence of a persistent advantage**.
+
+## What would I improve next?
+
+- Check data against another source and explicitly report missing daily observations.
+- Add exposure-matched benchmarks and daily portfolio valuation.
+- Separate spread momentum from interest-rate exposure and bond income.
+- Test next-session execution and more realistic costs during stressed markets.
+- Freeze the rules for prospective paper monitoring before making stronger claims.
 
 ## Reproduce
 
