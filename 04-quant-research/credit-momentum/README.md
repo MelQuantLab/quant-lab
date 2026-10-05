@@ -90,7 +90,7 @@ investment rather than literal cash. Results are in USD without a GBP currency h
 | Cost | 10 bp per dollar bought or sold, including SHY; 100% switch incurs 20 bp |
 | Rebalancing | Monthly, turnover measured against weights drifted by asset returns |
 | Benchmark 1 | HYG purchased once; same initial trading cost; no forced final liquidation |
-| Benchmark 2 | 50/50 HYG/LQD, monthly rebalanced with the same turnover/cost model |
+| Benchmark 2 | Equal-weight credit blend across configured credit ETFs; monthly rebalanced with the same costs (default: 50% HYG, 50% LQD) |
 | Sharpe | Monthly return minus realised SHY return, annualised with √12 |
 | Drawdown | Month-end equity including initial capital of 1; intramonth losses not measured |
 
@@ -104,9 +104,13 @@ The rule and constraints are fixed for this implementation. This is a
 retrospective study, **not a preregistered or untouched out-of-sample test**.
 The split below checks period dependence; parameters are not tuned separately.
 
+The **Equal-weight credit blend** assigns `1 / N` to each configured credit ETF
+and rebalances monthly. With the default two ETFs this is 50% each; with three
+credit ETFs it is one-third each. The published results below use HYG and LQD.
+
 ### Full-sample results after modelled trading costs
 
-| Metric | Credit momentum | 50/50 credit blend | HYG buy-and-hold |
+| Metric | Credit momentum | Equal-weight credit blend | HYG buy-and-hold |
 | --- | ---: | ---: | ---: |
 | Annualised return | 4.23% | 4.70% | 5.14% |
 | Annualised volatility | 4.21% | 8.72% | 10.43% |
@@ -267,11 +271,12 @@ Validate prices → monthly observations → target weights → lagged holdings
 | `build_report.py` | Fixed sensitivity comparisons and chart/export generation |
 | `tests/test_credit_momentum.py` | Financial timing and accounting checks using synthetic data |
 
-The main script is about 150 lines. Supporting checks and reporting live in
+The main script is 164 lines. Supporting checks and reporting live in
 `backtest_helpers.py`; the complete implementation is larger than 150 lines.
 Keep both files together when running the script.
 
-`run_backtest` takes the settings directly as function inputs; `metrics`
+`StrategyConfig` holds the asset universe and strategy settings. `run_backtest`
+accepts a configuration or individual setting overrides; `metrics`
 summarises the returns. For example, `run_backtest(prices, cost_bps=10)` runs
 the default strategy with a 10 bp trading cost. Comments explain the signal lag, allocation
 caps, Treasury residual, two-sided turnover and drift between rebalances.
