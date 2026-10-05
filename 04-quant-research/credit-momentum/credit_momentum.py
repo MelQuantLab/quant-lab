@@ -5,6 +5,7 @@ returns and summary statistics. Downloads and chart generation live separately.
 """
 
 import argparse
+import calendar
 import json
 from pathlib import Path
 
@@ -45,7 +46,7 @@ class Config:
         self.max_credit_weight = max_credit_weight
 
 
-def metrics(returns, cash):
+def metrics(returns, shy_returns):
     """Calculate monthly performance, using SHY as the excess-return reference.
 
     The initial capital of one is included in the drawdown peak. A portfolio
@@ -53,7 +54,7 @@ def metrics(returns, cash):
     """
     equity = (1 + returns).cumprod()
     peak = equity.cummax().clip(lower=1.0)
-    excess_returns = returns - cash
+    excess_returns = returns - shy_returns
     excess_volatility = excess_returns.std(ddof=1)
     sharpe = None
     if excess_volatility > 1e-12:
@@ -91,15 +92,28 @@ def get_monthly_prices(prices):
             "Prices must be finite, positive and aligned without missing data"
         )
 
-    monthly_prices = aligned_prices.groupby(prices.index.to_period("M")).tail(1)
-    calendar_months = monthly_prices.index.to_period("M").astype("int64")
-    if len(calendar_months) > 1 and not np.all(np.diff(calendar_months) == 1):
-        raise ValueError("Monthly history must be contiguous")
+    # Updating the same month replaces its earlier row with the latest row.
+    last_row_in_month = {}
+    for row, date in enumerate(aligned_prices.index):
+        month = (date.year, date.month)
+        last_row_in_month[month] = row
+    monthly_prices = aligned_prices.iloc[list(last_row_in_month.values())]
 
-    # This weekday calendar does not model exchange holidays. The published
-    # input ends on 31 December 2025, which is a complete trading month.
+    previous_month = None
+    for date in monthly_prices.index:
+        month_number = date.year * 12 + date.month
+        if previous_month is not None and month_number != previous_month + 1:
+            raise ValueError("Monthly history must be contiguous")
+        previous_month = month_number
+
+    # Find the final weekday of the input's last month. Exchange holidays
+    # are not modelled; the published input ends on 31 December 2025.
     final_date = aligned_prices.index[-1]
-    if final_date < final_date + pd.offsets.BMonthEnd(0):
+    days_in_month = calendar.monthrange(final_date.year, final_date.month)[1]
+    last_weekday = final_date.replace(day=days_in_month)
+    while last_weekday.weekday() >= 5:
+        last_weekday = last_weekday - pd.Timedelta(days=1)
+    if final_date < last_weekday:
         monthly_prices = monthly_prices.iloc[:-1]
     return monthly_prices
 
@@ -108,24 +122,36 @@ def get_target_weights(monthly_prices, asset_returns, config):
     """Build closing targets; the caller lags them before earning returns."""
     momentum = monthly_prices.pct_change(config.momentum_months, fill_method=None)
     volatility = asset_returns.rolling(config.volatility_months).std(ddof=1)
-    inverse_volatility = pd.DataFrame(index=monthly_prices.index)
-    for asset in CREDIT_ASSETS:
-        eligible = momentum[asset] > momentum[DEFENSIVE_ASSET]
-        asset_volatility = volatility[asset].replace(0, np.nan)
-        inverse_volatility[asset] = (1 / asset_volatility).where(eligible, 0).fillna(0)
+    targets = pd.DataFrame(0.0, index=monthly_prices.index, columns=ASSETS)
+    history_ready = pd.Series(False, index=monthly_prices.index)
 
-    # Divide each eligible ETF's score by the total to get portfolio weights.
-    # If neither ETF qualifies, both weights are zero and SHY gets the balance.
-    total_score = inverse_volatility.sum(axis=1).replace(0, np.nan)
-    credit_weights = pd.DataFrame(index=monthly_prices.index)
-    for asset in CREDIT_ASSETS:
-        credit_weights[asset] = (inverse_volatility[asset] / total_score).fillna(0)
+    for date in monthly_prices.index:
+        # Wait until both lookbacks are available for every ETF.
+        ready = True
+        for asset in ASSETS:
+            if pd.isna(momentum.loc[date, asset]):
+                ready = False
+            if pd.isna(volatility.loc[date, asset]):
+                ready = False
+        history_ready.loc[date] = ready
 
-    # Caps leave a Treasury residual; capped weights are not renormalised.
-    credit_weights = credit_weights.clip(upper=config.max_credit_weight)
-    targets = credit_weights.copy()
-    targets["SHY"] = 1 - credit_weights.sum(axis=1)
-    history_ready = volatility.notna().all(axis=1) & momentum.notna().all(axis=1)
+        scores = {"HYG": 0.0, "LQD": 0.0}
+        for asset in CREDIT_ASSETS:
+            asset_momentum = momentum.loc[date, asset]
+            shy_momentum = momentum.loc[date, "SHY"]
+            asset_volatility = volatility.loc[date, asset]
+            if asset_momentum > shy_momentum and asset_volatility > 0:
+                scores[asset] = 1 / asset_volatility
+
+        total_score = scores["HYG"] + scores["LQD"]
+        if total_score > 0:
+            for asset in CREDIT_ASSETS:
+                weight = scores[asset] / total_score
+                targets.loc[date, asset] = min(weight, config.max_credit_weight)
+
+        # Any amount left after the credit allocations goes into SHY.
+        credit_weight = targets.loc[date, "HYG"] + targets.loc[date, "LQD"]
+        targets.loc[date, "SHY"] = 1 - credit_weight
     return targets, history_ready
 
 
@@ -145,12 +171,15 @@ def calculate_portfolio_returns(weights, asset_returns, cost_bps):
         target_weights = weights.iloc[month].to_numpy()
         month_returns = asset_returns.iloc[month].to_numpy()
         traded_weight = float(np.abs(target_weights - drifted_weights).sum())
-        gross_return = float(np.dot(target_weights, month_returns))
+        weighted_returns = target_weights * month_returns
+        gross_return = float(weighted_returns.sum())
         trading_cost = traded_weight * cost_rate
 
         net_returns.append((1 - trading_cost) * (1 + gross_return) - 1)
         turnover.append(traded_weight)
-        drifted_weights = target_weights * (1 + month_returns) / (1 + gross_return)
+        end_values = target_weights * (1 + month_returns)
+        portfolio_value = 1 + gross_return
+        drifted_weights = end_values / portfolio_value
 
     return (
         pd.Series(net_returns, index=weights.index),
