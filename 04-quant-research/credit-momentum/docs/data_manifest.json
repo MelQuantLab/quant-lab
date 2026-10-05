@@ -1,0 +1,17 @@
+{
+  "provider": "Yahoo Finance via yfinance",
+  "auto_adjust": true,
+  "start_inclusive": "2007-01-01",
+  "end_exclusive": "2026-01-01",
+  "tickers": [
+    "HYG",
+    "LQD",
+    "SHY"
+  ],
+  "rows": 4713,
+  "first_date": "2007-04-11",
+  "last_date": "2025-12-31",
+  "retrieved_utc": "2026-10-05T13:03:39.533084+00:00",
+  "yfinance_version": "1.7.0",
+  "sha256": "2472367a515e95d83ef8d9428a2d3820c977b626cfed5f7c73f27e061dea4125"
+}

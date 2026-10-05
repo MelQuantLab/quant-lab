@@ -99,7 +99,9 @@ The Trader Toolkit is being developed as a defined collection:
 
 - [Project 1: SPY 50/200 Moving-Average Backtester](02-financial-data/moving-average-backtester/)
   — a bias-aware, cost-aware comparison of a simple trend-following rule with
-  continuously holding SPY.
+  continuously holding SPY. **2005–2025: Sharpe 0.68 versus 0.63; annualised
+  return 8.69% versus 10.66%; maximum drawdown −33.72% versus −55.19%.**
+  Strategy includes 5 bp costs per position change; Sharpe uses 0% risk-free.
 - [Market Basket Monitor](market_basket_monitor/)
   — a configurable macOS workflow for market-price alerts, news monitoring,
   weekly reporting and an automatically maintained Excel dashboard.
@@ -110,6 +112,16 @@ The Trader Toolkit is being developed as a defined collection:
   — a risk-first Streamlit workflow connecting earnings and corporate events
   with inventory pressure, borrow-aware economics, seven-day and one-month
   horizons, scenario heatmaps and a review-ready daily briefing.
+
+### 04 — Quant Research
+
+- [Systematic Credit Momentum & Portfolio Construction](04-quant-research/credit-momentum/)
+  — completed ETF research implementation with monthly signals, inverse-volatility
+  sizing, credit caps, Treasury allocation, drift-aware transaction costs and
+  auditable holdings. **May 2008–December 2025: Sharpe versus SHY 0.70 versus
+  0.39 for HYG buy-and-hold; annualised return 4.23% versus 5.14%; month-end
+  maximum drawdown −7.31% versus −29.92%.** The 2016–2025 subperiod favours HYG
+  on Sharpe; full-sample risk reduction does not establish persistent alpha.
 
 ## Standards
 

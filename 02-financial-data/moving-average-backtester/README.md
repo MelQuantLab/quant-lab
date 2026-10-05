@@ -2,6 +2,26 @@
 
 Status: **Python MVP complete and verified**
 
+**2005–2025 result: Sharpe 0.68 versus buy-and-hold 0.63**, using the existing
+SPY 50/200 rule, 5 bp per position change and a 0% risk-free rate. Annualised
+return was **8.69% versus 10.66%**; maximum drawdown was **−33.72% versus −55.19%**.
+This sample improved risk-adjusted performance while sacrificing return.
+The result is sample-dependent: the older 2010–2026 demonstration below favoured
+buy-and-hold on both return and Sharpe.
+
+The fixed-period run covers 3 January 2005 through 31 December 2025 (5,283
+daily observations). The initial 200-day moving-average warm-up is included in
+both samples, with the strategy in zero-return cash. The benchmark is cost-free;
+strategy entry/exit costs are included, with no forced liquidation at the end.
+Adjusted prices include distributions; annualisation uses 252 trading days.
+No parameters were selected by maximising the result. This is a retrospective
+demonstration rather than an untouched out-of-sample test.
+
+Reproduce with `python reproduce_2005_2025.py` after installation. The script
+caches local prices; remove its raw CSV to refresh the download. Curated
+[metrics](docs/results_2005_2025/metrics.json) and
+[data provenance](docs/results_2005_2025/data_manifest.json) record the run.
+
 Next stage: complete user testing of the Excel/VBA dashboard and weekly
 PDF/email automation.
 
@@ -70,8 +90,9 @@ credit-market research.
 
 ## 4. What did I learn?
 
-- The rule was understandable and reduced time invested, but it did not beat
-  buy-and-hold on total return or Sharpe ratio in this sample.
+- The rule reduced time invested. In the original 2010–2026 sample it did not
+  beat buy-and-hold on total return or Sharpe; the 2005–2025 run improved Sharpe
+  but still lagged on return. Conclusions depend on the evaluation period.
 - A plausible financial story is not evidence of an investable edge.
 - Correct timing, transaction costs and honest benchmark comparison matter as
   much as the trading signal itself.
