@@ -1,0 +1,10 @@
+{
+  "provider": "Yahoo Finance via yfinance",
+  "ticker": "SPY",
+  "auto_adjust": true,
+  "start_inclusive": "2005-01-01",
+  "end_exclusive": "2026-01-01",
+  "retrieved_utc": "2026-10-05T13:04:59.060454+00:00",
+  "yfinance_version": "1.7.0",
+  "sha256": "a1c183f15df3cecf7f3da861c77dc581a6ede5dc4bd7e4ed24b612feeba6d0c5"
+}

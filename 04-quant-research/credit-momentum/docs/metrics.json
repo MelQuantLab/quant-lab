@@ -1,0 +1,92 @@
+{
+  "config": {
+    "momentum_months": 6,
+    "volatility_months": 12,
+    "cost_bps": 10.0,
+    "max_credit_weight": 0.6
+  },
+  "start": "2008-05-30",
+  "end": "2025-12-31",
+  "average_credit_weight": 0.6807671495358641,
+  "annualised_turnover": 3.6693475950072183,
+  "portfolios": {
+    "Credit momentum": {
+      "full_sample": {
+        "months": 212,
+        "total_return": 1.0805423468120594,
+        "annualised_return": 0.042341415388274406,
+        "annualised_volatility": 0.042105223093049676,
+        "sharpe_vs_SHY": 0.7002610795724261,
+        "maximum_drawdown_month_end": -0.07312570820333109
+      },
+      "2008-2015": {
+        "months": 92,
+        "total_return": 0.5530117694940391,
+        "annualised_return": 0.059097240731408984,
+        "annualised_volatility": 0.04449540325456845,
+        "sharpe_vs_SHY": 1.0627394128003196,
+        "maximum_drawdown_month_end": -0.05027219508625247
+      },
+      "2016-2025": {
+        "months": 120,
+        "total_return": 0.3396822790917342,
+        "annualised_return": 0.029675030478083286,
+        "annualised_volatility": 0.039999172660568634,
+        "sharpe_vs_SHY": 0.37186028663165943,
+        "maximum_drawdown_month_end": -0.07312570820333075
+      }
+    },
+    "50/50 credit blend": {
+      "full_sample": {
+        "months": 212,
+        "total_return": 1.2517643111702639,
+        "annualised_return": 0.047017952285164366,
+        "annualised_volatility": 0.0872352282301242,
+        "sharpe_vs_SHY": 0.4080434449169524,
+        "maximum_drawdown_month_end": -0.21419838476457265
+      },
+      "2008-2015": {
+        "months": 92,
+        "total_return": 0.47457423312957503,
+        "annualised_return": 0.05196186562693916,
+        "annualised_volatility": 0.1021053847153705,
+        "sharpe_vs_SHY": 0.4184072438936119,
+        "maximum_drawdown_month_end": -0.21419838476457265
+      },
+      "2016-2025": {
+        "months": 120,
+        "total_return": 0.5270606664482491,
+        "annualised_return": 0.0432433597062738,
+        "annualised_volatility": 0.07427461927728755,
+        "sharpe_vs_SHY": 0.4129216039734257,
+        "maximum_drawdown_month_end": -0.1856392700607804
+      }
+    },
+    "HYG buy-and-hold": {
+      "full_sample": {
+        "months": 212,
+        "total_return": 1.4231378616806847,
+        "annualised_return": 0.05137404688003544,
+        "annualised_volatility": 0.10426075514951078,
+        "sharpe_vs_SHY": 0.3859610597374191,
+        "maximum_drawdown_month_end": -0.2992125795921161
+      },
+      "2008-2015": {
+        "months": 92,
+        "total_return": 0.42806932260917474,
+        "annualised_return": 0.04757394924333136,
+        "annualised_volatility": 0.134179869682461,
+        "sharpe_vs_SHY": 0.31156283852546046,
+        "maximum_drawdown_month_end": -0.2992125795921161
+      },
+      "2016-2025": {
+        "months": 120,
+        "total_return": 0.6967928820524296,
+        "annualised_return": 0.05429678790361736,
+        "annualised_volatility": 0.07420435545762635,
+        "sharpe_vs_SHY": 0.5413573090325904,
+        "maximum_drawdown_month_end": -0.15249270390911585
+      }
+    }
+  }
+}
