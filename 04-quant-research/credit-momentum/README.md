@@ -266,8 +266,9 @@ Validate prices → monthly observations → target weights → lagged holdings
 | `build_report.py` | Fixed sensitivity comparisons and chart/export generation |
 | `tests/test_credit_momentum.py` | Financial timing and accounting checks using synthetic data |
 
-`Config` holds the settings; `run_backtest` runs the calculation, and `metrics`
-summarises the returns. Comments explain the signal lag, allocation
+`run_backtest` takes the settings directly as function inputs; `metrics`
+summarises the returns. For example, `run_backtest(prices, cost_bps=10)` runs
+the default strategy with a 10 bp trading cost. Comments explain the signal lag, allocation
 caps, Treasury residual, two-sided turnover and drift between rebalances.
 
 Python 3.11+:

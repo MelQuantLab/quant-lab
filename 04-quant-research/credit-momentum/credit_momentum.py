@@ -21,31 +21,6 @@ MIN_EVALUATION_MONTHS = 12
 SUBPERIODS = [("2008-2015", "2008", "2015"), ("2016-2025", "2016", "2025")]
 
 
-class Config:
-    """Settings for the momentum rule and trading costs."""
-
-    def __init__(
-        self,
-        momentum_months=6,
-        volatility_months=12,
-        cost_bps=10.0,
-        max_credit_weight=0.60,
-    ):
-        if momentum_months < 1 or volatility_months < 2:
-            raise ValueError(
-                "Lookbacks must be positive; volatility needs at least 2 months"
-            )
-        if not np.isfinite(cost_bps) or not 0 <= cost_bps < 5000:
-            raise ValueError("Cost must be finite and between 0 and 5,000 bps")
-        if not 0 < max_credit_weight <= 1:
-            raise ValueError("Credit cap must be in (0, 1]")
-
-        self.momentum_months = momentum_months
-        self.volatility_months = volatility_months
-        self.cost_bps = cost_bps
-        self.max_credit_weight = max_credit_weight
-
-
 def metrics(returns, shy_returns):
     """Calculate monthly performance, using SHY as the excess-return reference.
 
@@ -118,10 +93,12 @@ def get_monthly_prices(prices):
     return monthly_prices
 
 
-def get_target_weights(monthly_prices, asset_returns, config):
+def get_target_weights(
+    monthly_prices, asset_returns, momentum_months, volatility_months, max_credit_weight
+):
     """Build closing targets; the caller lags them before earning returns."""
-    momentum = monthly_prices.pct_change(config.momentum_months, fill_method=None)
-    volatility = asset_returns.rolling(config.volatility_months).std(ddof=1)
+    momentum = monthly_prices.pct_change(momentum_months, fill_method=None)
+    volatility = asset_returns.rolling(volatility_months).std(ddof=1)
     targets = pd.DataFrame(0.0, index=monthly_prices.index, columns=ASSETS)
     history_ready = pd.Series(False, index=monthly_prices.index)
 
@@ -147,7 +124,7 @@ def get_target_weights(monthly_prices, asset_returns, config):
         if total_score > 0:
             for asset in CREDIT_ASSETS:
                 weight = scores[asset] / total_score
-                targets.loc[date, asset] = min(weight, config.max_credit_weight)
+                targets.loc[date, asset] = min(weight, max_credit_weight)
 
         # Any amount left after the credit allocations goes into SHY.
         credit_weight = targets.loc[date, "HYG"] + targets.loc[date, "LQD"]
@@ -187,15 +164,10 @@ def calculate_portfolio_returns(weights, asset_returns, cost_bps):
     )
 
 
-def get_summary(frame, config):
+def get_summary(frame, settings):
     """Report the continuous run and fixed descriptive subperiods."""
     summary = {
-        "config": {
-            "momentum_months": config.momentum_months,
-            "volatility_months": config.volatility_months,
-            "cost_bps": config.cost_bps,
-            "max_credit_weight": config.max_credit_weight,
-        },
+        "config": settings,
         "start": str(frame.index[0].date()),
         "end": str(frame.index[-1].date()),
         "average_credit_weight": float(
@@ -225,7 +197,10 @@ def get_summary(frame, config):
 
 def run_backtest(
     prices,
-    config=None,
+    momentum_months=6,
+    volatility_months=12,
+    cost_bps=10.0,
+    max_credit_weight=0.60,
     start="2008-05-01",
     end="2025-12-31",
 ):
@@ -235,11 +210,30 @@ def run_backtest(
     A closing target earns only the following month's return. All portfolios
     begin in SHY and remain open at the end; no liquidation cost is imposed.
     """
-    if config is None:
-        config = Config()
+    if momentum_months < 1 or volatility_months < 2:
+        raise ValueError(
+            "Lookbacks must be positive; volatility needs at least 2 months"
+        )
+    if not np.isfinite(cost_bps) or not 0 <= cost_bps < 5000:
+        raise ValueError("Cost must be finite and between 0 and 5,000 bps")
+    if not 0 < max_credit_weight <= 1:
+        raise ValueError("Credit cap must be in (0, 1]")
+
+    settings = {
+        "momentum_months": momentum_months,
+        "volatility_months": volatility_months,
+        "cost_bps": cost_bps,
+        "max_credit_weight": max_credit_weight,
+    }
     monthly_prices = get_monthly_prices(prices)
     monthly_returns = monthly_prices.pct_change(fill_method=None)
-    targets, history_ready = get_target_weights(monthly_prices, monthly_returns, config)
+    targets, history_ready = get_target_weights(
+        monthly_prices,
+        monthly_returns,
+        momentum_months,
+        volatility_months,
+        max_credit_weight,
+    )
 
     evaluation_mask = (
         history_ready.shift(1, fill_value=False)
@@ -252,7 +246,7 @@ def run_backtest(
         raise ValueError("Need at least 12 evaluation months after warm-up")
 
     strategy_returns, strategy_turnover = calculate_portfolio_returns(
-        holdings, asset_returns, config.cost_bps
+        holdings, asset_returns, cost_bps
     )
     blend_weights = pd.DataFrame(
         {"HYG": 0.5, "LQD": 0.5, "SHY": 0.0},
@@ -260,12 +254,12 @@ def run_backtest(
         columns=ASSETS,
     )
     blend_returns, blend_turnover = calculate_portfolio_returns(
-        blend_weights, asset_returns, config.cost_bps
+        blend_weights, asset_returns, cost_bps
     )
 
     # Buy-and-hold pays only the initial SHY sale and HYG purchase.
     hyg_returns = asset_returns["HYG"].copy()
-    entry_cost = 2 * config.cost_bps / BASIS_POINTS_PER_UNIT
+    entry_cost = 2 * cost_bps / BASIS_POINTS_PER_UNIT
     hyg_returns.iloc[0] = (1 - entry_cost) * (1 + hyg_returns.iloc[0]) - 1
 
     performance = pd.DataFrame(
@@ -279,7 +273,7 @@ def run_backtest(
         }
     )
     frame = holdings.add_prefix("weight_").join(performance)
-    return frame, get_summary(frame, config)
+    return frame, get_summary(frame, settings)
 
 
 def main():
@@ -294,8 +288,9 @@ def main():
     args = parser.parse_args()
 
     prices = pd.read_csv(args.csv, index_col="Date", parse_dates=True)
-    config = Config(momentum_months=args.momentum_months, cost_bps=args.cost_bps)
-    frame, summary = run_backtest(prices, config)
+    frame, summary = run_backtest(
+        prices, momentum_months=args.momentum_months, cost_bps=args.cost_bps
+    )
 
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from credit_momentum import Config, metrics, run_backtest
+from credit_momentum import metrics, run_backtest
 
 WEIGHT_COLUMNS = ["weight_HYG", "weight_LQD", "weight_SHY"]
 
@@ -39,7 +39,7 @@ def test_future_prices_do_not_change_previous_allocations_or_returns(sample_pric
 
 def test_weights_caps_and_costs(sample_prices):
     frame, _ = run_backtest(sample_prices)
-    no_cost_frame, _ = run_backtest(sample_prices, Config(cost_bps=0))
+    no_cost_frame, _ = run_backtest(sample_prices, cost_bps=0)
 
     assert np.allclose(frame[WEIGHT_COLUMNS].sum(axis=1), 1)
     assert (frame[["weight_HYG", "weight_LQD"]] <= 0.6).all().all()

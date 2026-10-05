@@ -10,7 +10,7 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402 - backend must be selected first
 
-from credit_momentum import Config, run_backtest  # noqa: E402
+from credit_momentum import run_backtest  # noqa: E402
 
 MOMENTUM_LOOKBACKS = (3, 6, 12)
 COST_SCENARIOS_BPS = (0, 10, 25)
@@ -26,8 +26,9 @@ def build_sensitivity(prices):
     scenarios = []
     for momentum_months in MOMENTUM_LOOKBACKS:
         for cost_bps in COST_SCENARIOS_BPS:
-            config = Config(momentum_months=momentum_months, cost_bps=cost_bps)
-            _, summary = run_backtest(prices, config)
+            _, summary = run_backtest(
+                prices, momentum_months=momentum_months, cost_bps=cost_bps
+            )
             baseline_metrics = summary["portfolios"]["Credit momentum"]["full_sample"]
             scenarios.append(
                 {
